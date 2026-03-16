@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/Visoff/messanger/internal/services"
@@ -43,13 +42,13 @@ func (c *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 
-	user, err := c.userService.RegisterUser(r.Context(), &dto)
+	token, err := c.userService.RegisterUser(r.Context(), &dto)
 	if err != nil {
 		return err
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(token)
 
 	return nil
 }
@@ -67,7 +66,8 @@ func (c *UserController) LoginUser(w http.ResponseWriter, r *http.Request) error
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write(fmt.Appendf(nil, `{"token":"%s"}`, token))
+	json.NewEncoder(w).Encode(token)
+
 	return nil
 }
 

@@ -5,10 +5,66 @@
 package repository
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type ChatType string
+
+const (
+	ChatTypePrivate ChatType = "private"
+	ChatTypeGroup   ChatType = "group"
+	ChatTypeChannel ChatType = "channel"
+)
+
+func (e *ChatType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ChatType(s)
+	case string:
+		*e = ChatType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ChatType: %T", src)
+	}
+	return nil
+}
+
+type NullChatType struct {
+	ChatType ChatType `json:"chat_type"`
+	Valid    bool     `json:"valid"` // Valid is true if ChatType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullChatType) Scan(value interface{}) error {
+	if value == nil {
+		ns.ChatType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ChatType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullChatType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ChatType), nil
+}
+
+type Chat struct {
+	ID        uuid.UUID  `json:"id"`
+	Title     string     `json:"title"`
+	Type      ChatType   `json:"type"`
+	AvatarUrl *string    `json:"avatar_url"`
+	Metadata  []byte     `json:"metadata"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at"`
+}
 
 type User struct {
 	ID           uuid.UUID  `json:"id"`

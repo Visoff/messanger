@@ -24,6 +24,10 @@ func (s *UserService) ProtectRoute(handler handlers.Handler) handlers.Handler {
 	return s.authService.ProtectRoute(handler)
 }
 
+type AccessToken struct {
+	Token string `json:"token"`
+}
+
 type RegisterUserDTO struct {
 	Username     string `json:"username"`
 	Password string `json:"password"`
@@ -40,7 +44,7 @@ func (dto *RegisterUserDTO) Validate() error {
 	return httperrors.NewHTTPValidationError(errors)
 }
 
-func (s *UserService) RegisterUser(ctx context.Context, dto *RegisterUserDTO) (*repository.User, error) {
+func (s *UserService) RegisterUser(ctx context.Context, dto *RegisterUserDTO) (*AccessToken, error) {
 	usr, err := s.repository.CreateUser(ctx, &repository.CreateUserParams{
 		Username: dto.Username,
 		PasswordHash: s.authService.HashPassword(dto.Password),
@@ -51,7 +55,7 @@ func (s *UserService) RegisterUser(ctx context.Context, dto *RegisterUserDTO) (*
 		}
 		return nil, err
 	}
-	return usr, nil
+	return &AccessToken{Token: s.authService.GenerateToken(usr.ID.String())}, nil
 }
 
 type LoginUserDTO struct {
@@ -70,17 +74,17 @@ func (dto *LoginUserDTO) Validate() error {
 	return httperrors.NewHTTPValidationError(errors)
 }
 
-func (s *UserService) LoginUser(ctx context.Context, dto *LoginUserDTO) (string, error) {
+func (s *UserService) LoginUser(ctx context.Context, dto *LoginUserDTO) (*AccessToken, error) {
 	user, err := s.repository.GetUserByUsername(ctx, dto.Username)
 	if err != nil {
-		return "", httperrors.NewHTTPNotFoundError("User not found")
+		return nil, httperrors.NewHTTPNotFoundError("User not found")
 	}
 	if !s.authService.CheckPassword(dto.Password, user.PasswordHash) {
-		return "", httperrors.NewHTTPUnauthorizedError("Invalid password")
+		return nil, httperrors.NewHTTPUnauthorizedError("Invalid password")
 	}
 
 	token := s.authService.GenerateToken(user.ID.String())
-	return token, nil
+	return &AccessToken{Token: token}, nil
 }
 
 func (s *UserService) GetMe(r *http.Request) (*repository.User, error) {

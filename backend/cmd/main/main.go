@@ -32,13 +32,16 @@ func main() {
 	// services
 	auth_service := services.NewAuthService("secret")
 	user_service := services.NewUserService(repo, auth_service)
+	chat_service := services.NewChatService(repo)
 
 	// controllers
 	user_controller := controllers.NewUserController(user_service)
+	chat_controller := controllers.NewChatController(chat_service)
 
 	mux := http.NewServeMux()
 
 	mux.Handle("/users/", http.StripPrefix("/users", user_controller))
+	mux.Handle("/chats/", http.StripPrefix("/chats", chat_controller))
 
 	log.Println("Server is running on port 8080")
 	err = http.ListenAndServe(":8080", mux)
