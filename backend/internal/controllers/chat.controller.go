@@ -34,7 +34,10 @@ func (c *ChatController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ChatController) ListChats(w http.ResponseWriter, r *http.Request) error {
-	chats := c.chatService.ListChats(r.Context())
+	chats, err := c.chatService.ListChats(r.Context())
+	if err != nil {
+		return err
+	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(chats)
 	return nil

@@ -15,12 +15,14 @@ func NewChatService(repository *repository.Queries) *ChatService {
 	return &ChatService{repository: repository}
 }
 
-func (s *ChatService) ListChats(ctx context.Context) []*repository.Chat {
-	list, err := s.repository.ListChats(ctx)
+func (s *ChatService) ListChats(ctx context.Context) ([]*repository.Chat, error) {
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {return []*repository.Chat{}, err}
+	list, err := s.repository.ListChats(ctx, user_id)
 	if err != nil {
-		return []*repository.Chat{}
+		return []*repository.Chat{}, nil
 	}
-	return list
+	return list, nil
 }
 
 type CreateChatDTO struct {
@@ -46,8 +48,31 @@ func (dto *CreateChatDTO) Validate() error {
 }
 
 func (s *ChatService) CreateChat(ctx context.Context, dto *CreateChatDTO) (*repository.Chat, error) {
-	return s.repository.CreateChat(ctx, &repository.CreateChatParams{
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {return nil, err}
+	qtx, tx, err := s.repository.NewTx(ctx)
+	defer tx.Rollback(ctx)
+	if err != nil {
+		return nil, err
+	}
+	chat, err := qtx.CreateChat(ctx, &repository.CreateChatParams{
 		Title: dto.Title,
 		Type: repository.ChatType(dto.Type),
 	})
+	if err != nil {
+		return nil, err
+	}
+	err = qtx.AddUserToChat(ctx, &repository.AddUserToChatParams{
+		ChatID: chat.ID,
+		UserID: user_id,
+		Role: repository.ChatRoleOwner,
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return chat, nil
 }

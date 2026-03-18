@@ -9,14 +9,14 @@ import (
 	"github.com/Visoff/messanger/internal/migrations"
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/internal/services"
-	"github.com/Visoff/messanger/pkgs/database"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	err := godotenv.Load()
 	ctx := context.Background()
-	pool, err := database.New(ctx, "postgres://postgres:postgres@localhost/postgres?sslmode=disable")
+	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost/postgres?sslmode=disable")
 
 	if err = pool.Ping(ctx); err != nil {
 		panic(err)

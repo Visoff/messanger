@@ -8,7 +8,6 @@ import (
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/pkgs/handlers"
 	"github.com/Visoff/messanger/pkgs/httperrors"
-	"github.com/google/uuid"
 )
 
 type UserService struct {
@@ -88,8 +87,7 @@ func (s *UserService) LoginUser(ctx context.Context, dto *LoginUserDTO) (*Access
 }
 
 func (s *UserService) GetMe(r *http.Request) (*repository.User, error) {
-	user_id := s.authService.PullUserIdFromAuth(r)
-	id, err := uuid.Parse(user_id)
+	id, err := ExtractUserId(r.Context())
 	if err != nil {
 		return nil, httperrors.NewHTTPUnauthorizedError("Unauthorized")
 	}

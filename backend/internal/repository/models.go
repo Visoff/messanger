@@ -12,6 +12,49 @@ import (
 	"github.com/google/uuid"
 )
 
+type ChatRole string
+
+const (
+	ChatRoleOwner  ChatRole = "owner"
+	ChatRoleAdmin  ChatRole = "admin"
+	ChatRoleMember ChatRole = "member"
+)
+
+func (e *ChatRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ChatRole(s)
+	case string:
+		*e = ChatRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ChatRole: %T", src)
+	}
+	return nil
+}
+
+type NullChatRole struct {
+	ChatRole ChatRole `json:"chat_role"`
+	Valid    bool     `json:"valid"` // Valid is true if ChatRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullChatRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.ChatRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ChatRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullChatRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ChatRole), nil
+}
+
 type ChatType string
 
 const (
@@ -64,6 +107,15 @@ type Chat struct {
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	DeletedAt *time.Time `json:"deleted_at"`
+}
+
+type ChatMember struct {
+	ID       uuid.UUID  `json:"id"`
+	UserID   uuid.UUID  `json:"user_id"`
+	ChatID   uuid.UUID  `json:"chat_id"`
+	Role     ChatRole   `json:"role"`
+	JoinedAt time.Time  `json:"joined_at"`
+	LeftAt   *time.Time `json:"left_at"`
 }
 
 type User struct {

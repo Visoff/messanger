@@ -7,7 +7,30 @@ package repository
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
+
+const addUserToChat = `-- name: AddUserToChat :exec
+INSERT INTO chat_members (
+    user_id,
+    chat_id,
+    role
+) VALUES (
+    $1, $2, $3
+)
+`
+
+type AddUserToChatParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	ChatID uuid.UUID `json:"chat_id"`
+	Role   ChatRole  `json:"role"`
+}
+
+func (q *Queries) AddUserToChat(ctx context.Context, arg *AddUserToChatParams) error {
+	_, err := q.db.Exec(ctx, addUserToChat, arg.UserID, arg.ChatID, arg.Role)
+	return err
+}
 
 const createChat = `-- name: CreateChat :one
 INSERT INTO chats (
@@ -39,12 +62,33 @@ func (q *Queries) CreateChat(ctx context.Context, arg *CreateChatParams) (*Chat,
 	return &i, err
 }
 
-const listChats = `-- name: ListChats :many
-SELECT id, title, type, avatar_url, metadata, created_at, updated_at, deleted_at from chats
+const joinUserToChat = `-- name: JoinUserToChat :exec
+INSERT INTO chat_members (
+    user_id,
+    chat_id
+) VALUES (
+    $1, $2
+)
 `
 
-func (q *Queries) ListChats(ctx context.Context) ([]*Chat, error) {
-	rows, err := q.db.Query(ctx, listChats)
+type JoinUserToChatParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	ChatID uuid.UUID `json:"chat_id"`
+}
+
+func (q *Queries) JoinUserToChat(ctx context.Context, arg *JoinUserToChatParams) error {
+	_, err := q.db.Exec(ctx, joinUserToChat, arg.UserID, arg.ChatID)
+	return err
+}
+
+const listChats = `-- name: ListChats :many
+SELECT chats.id, chats.title, chats.type, chats.avatar_url, chats.metadata, chats.created_at, chats.updated_at, chats.deleted_at from chats
+left join chat_members on chat_members.chat_id = chats.id
+where chat_members.user_id = $1
+`
+
+func (q *Queries) ListChats(ctx context.Context, userID uuid.UUID) ([]*Chat, error) {
+	rows, err := q.db.Query(ctx, listChats, userID)
 	if err != nil {
 		return nil, err
 	}

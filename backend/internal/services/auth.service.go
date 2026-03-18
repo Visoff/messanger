@@ -8,6 +8,7 @@ import (
 	"github.com/Visoff/messanger/pkgs/handlers"
 	"github.com/Visoff/messanger/pkgs/httperrors"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -75,9 +76,14 @@ func (s *AuthService) ProtectRoute(handler handlers.Handler) handlers.Handler {
 }
 
 
-func (s *AuthService) PullUserIdFromAuth(r *http.Request) string {
-	if user_id, ok := r.Context().Value("user_id").(string); ok {
-		return user_id
+func ExtractUserId(ctx context.Context) (uuid.UUID, error) {
+	user_id, ok := ctx.Value("user_id").(string)
+	if !ok {
+		return uuid.UUID{}, httperrors.NewHTTPUnauthorizedError("Unauthorized")
 	}
-	return ""
+	uid, err := uuid.Parse(user_id)
+	if err != nil {
+		return uuid.UUID{}, httperrors.NewHTTPUnauthorizedError("Unauthorized")
+	}
+	return uid, nil
 }
