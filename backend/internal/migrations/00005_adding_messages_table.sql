@@ -13,4 +13,4 @@ CREATE TABLE "messages" (
 
 
 -- +goose Down
-DROP TABLE "messsages";
+DROP TABLE "messages";
