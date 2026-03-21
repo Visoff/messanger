@@ -35,6 +35,18 @@ func NewUserController(userService *services.UserService) *UserController {
 	return c
 }
 
+// RegisterUser registers a new user.
+// @Summary      Register a user
+// @Description  Register a new user.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Param        request body services.RegisterUserDTO true "User details"
+// @Success      200  {object}  services.AccessToken
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /users/register [post]
 func (c *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) error {
 	var dto services.RegisterUserDTO
 
@@ -53,6 +65,18 @@ func (c *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
+// LoginUser logs in a user.
+// @Summary      Login a user
+// @Description  Log in a user.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Param        request body services.LoginUserDTO true "User details"
+// @Success      200  {object}  services.AccessToken
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /users/login [post]
 func (c *UserController) LoginUser(w http.ResponseWriter, r *http.Request) error {
 	var dto services.LoginUserDTO
 

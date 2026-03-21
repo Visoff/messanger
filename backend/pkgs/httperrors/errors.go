@@ -7,6 +7,13 @@ import (
 	"net/http"
 )
 
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Status  int    `json:"status"`
+	Message string `json:"message"`
+
+	Details map[string]string `json:"details,omitempty"`
+}
 
 type HTTPError interface {
 	Error() string
@@ -108,7 +115,7 @@ func (e *HTTPFormParsingError) Status() string {
 	return "Form parsing error"
 }
 
-type HTTPUnsupportedMediaTypeError struct {}
+type HTTPUnsupportedMediaTypeError struct{}
 
 func NewHTTPUnsupportedMediaTypeError() *HTTPUnsupportedMediaTypeError {
 	return &HTTPUnsupportedMediaTypeError{}

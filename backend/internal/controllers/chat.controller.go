@@ -33,6 +33,18 @@ func (c *ChatController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.mux.ServeHTTP(w, r)
 }
 
+// ListChats returns a list of all chats.
+// @Summary      List all chats
+// @Description  Returns a list of all chats.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  []repository.Chat
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/ [get]
+// @Security     BearerAuth
 func (c *ChatController) ListChats(w http.ResponseWriter, r *http.Request) error {
 	chats, err := c.chatService.ListChats(r.Context())
 	if err != nil {
@@ -43,6 +55,19 @@ func (c *ChatController) ListChats(w http.ResponseWriter, r *http.Request) error
 	return nil
 }
 
+// CreateChat creates a new chat and adds the authenticated user as owner.
+// @Summary      Create a chat
+// @Description  Create a new chat (private, group, or channel). The authenticated user becomes the owner.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        request body services.CreateChatDTO true "Chat details"
+// @Success      200  {object}  repository.Chat
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/ [post]
+// @Security     BearerAuth
 func (c *ChatController) CreateChat(w http.ResponseWriter, r *http.Request) error {
 	var dto services.CreateChatDTO
 	

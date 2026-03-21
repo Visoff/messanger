@@ -5,14 +5,36 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Visoff/messanger/docs"
 	"github.com/Visoff/messanger/internal/controllers"
 	"github.com/Visoff/messanger/internal/migrations"
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/internal/services"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+
+	httpswagger "github.com/swaggo/http-swagger"
 )
 
+// @title           Messenger API
+// @version         1.0
+// @description     API for a messenger application.
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    http://www.swagger.io/support
+// @contact.email  support@swagger.io
+
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host      localhost:8080
+// @BasePath  /
+
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 Type "Bearer " followed by your JWT token.
 func main() {
 	err := godotenv.Load()
 	ctx := context.Background()
@@ -42,6 +64,11 @@ func main() {
 
 	mux.Handle("/users/", http.StripPrefix("/users", user_controller))
 	mux.Handle("/chats/", http.StripPrefix("/chats", chat_controller))
+
+	mux.Handle("/docs/swagger.json", http.StripPrefix("/docs", http.FileServerFS(docs.Docs)))
+	mux.Handle("/docs/", httpswagger.Handler(
+		httpswagger.URL("http://localhost:8080/docs/swagger.json"),
+	))
 
 	log.Println("Server is running on port 8080")
 	err = http.ListenAndServe(":8080", mux)

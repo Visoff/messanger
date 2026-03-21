@@ -26,8 +26,8 @@ func (s *ChatService) ListChats(ctx context.Context) ([]*repository.Chat, error)
 }
 
 type CreateChatDTO struct {
-	Title string `json:"title"`
-	Type  string `json:"type"`
+	Title string `json:"title" example:"General Chat"`
+	Type  string `json:"type"  example:"group" enums:"private,group,channel"`
 }
 
 func (dto *CreateChatDTO) Validate() error {

@@ -5,9 +5,9 @@ tmp_dir = "tmp"
 [build]
   args_bin = []
   bin = "./tmp/main"
-  cmd = "sqlc generate && go build -o ./tmp/main cmd/main/main.go"
+  cmd = "swag init -g cmd/main/main.go && sqlc generate && go build -o ./tmp/main cmd/main/main.go"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "internal/repository"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "internal/repository", "docs"]
   exclude_file = []
   exclude_regex = ["_test.go", "_templ.go"]
   exclude_unchanged = false
