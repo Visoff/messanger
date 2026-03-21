@@ -110,6 +110,18 @@ definitions:
         example: group
         type: string
     type: object
+  services.CreateTopicDTO:
+    properties:
+      title:
+        example: General Chat
+        type: string
+      type:
+        enum:
+        - text_topic
+        - voice_topic
+        example: group
+        type: string
+    type: object
   services.LoginUserDTO:
     properties:
       password:
@@ -205,6 +217,41 @@ paths:
       summary: Create a chat
       tags:
       - chats
+  /chats/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Returns a chat by ID.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Chat'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a chat by ID
+      tags:
+      - chats
   /chats/{id}/messages:
     get:
       consumes:
@@ -277,6 +324,46 @@ paths:
       security:
       - BearerAuth: []
       summary: List all topics in a chat
+      tags:
+      - topics
+    post:
+      consumes:
+      - application/json
+      description: Creates a new topic in a chat.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Topic details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateTopicDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Topic'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new topic in a chat
       tags:
       - topics
   /topics/{id}/messages:

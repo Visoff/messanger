@@ -62,6 +62,27 @@ func (q *Queries) CreateChat(ctx context.Context, arg *CreateChatParams) (*Chat,
 	return &i, err
 }
 
+const getChat = `-- name: GetChat :one
+SELECT id, title, type, avatar_url, metadata, created_at, updated_at, deleted_at FROM chats
+WHERE id = $1
+`
+
+func (q *Queries) GetChat(ctx context.Context, id uuid.UUID) (*Chat, error) {
+	row := q.db.QueryRow(ctx, getChat, id)
+	var i Chat
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Type,
+		&i.AvatarUrl,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return &i, err
+}
+
 const joinUserToChat = `-- name: JoinUserToChat :exec
 INSERT INTO chat_members (
     user_id,

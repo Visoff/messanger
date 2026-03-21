@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/Visoff/messanger/internal/repository"
-	"github.com/Visoff/messanger/pkgs/handlers"
 	"github.com/Visoff/messanger/pkgs/httperrors"
 )
 
@@ -17,10 +16,6 @@ type UserService struct {
 
 func NewUserService(repository *repository.Queries, authService *AuthService) *UserService {
 	return &UserService{repository: repository, authService: authService}
-}
-
-func (s *UserService) ProtectRoute(handler handlers.Handler) handlers.Handler {
-	return s.authService.ProtectRoute(handler)
 }
 
 type AccessToken struct {

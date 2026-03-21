@@ -14,7 +14,7 @@ type ChatController struct {
 	mux         *http.ServeMux
 }
 
-func NewChatController(chatService *services.ChatService) *ChatController {
+func NewChatController(chatService *services.ChatService, authService *services.AuthService) *ChatController {
 	c := &ChatController{
 		chatService: chatService,
 		mux:         nil,
@@ -23,18 +23,19 @@ func NewChatController(chatService *services.ChatService) *ChatController {
 	mux := http.NewServeMux()
 	c.mux = mux
 
-	mux.Handle("GET /", handlers.Handler(c.ListChats))
-	mux.Handle("POST /", handlers.Handler(c.CreateChat))
+	mux.Handle("GET /", authService.ProtectRoute(handlers.Handler(c.ListChats)))
+	mux.Handle("POST /", authService.ProtectRoute(handlers.Handler(c.CreateChat)))
+
+	mux.Handle("GET /{id}", authService.ProtectRoute(handlers.Handler(c.GetChat)))
 
 	/*
-	mux.Handle("GET /{id}", handlers.Handler(c.GetChat))
 	mux.Handle("PUT /{id}", handlers.Handler(c.UpdateChat))
 	mux.Handle("DELETE /{id}", handlers.Handler(c.DeleteChat))
 	*/
 
-	mux.Handle("GET /{id}/topics", handlers.Handler(c.ListTopics))
-	//mux.Handle("POST /{id}/topics", handlers.Handler(c.ListTopics))
-	mux.Handle("GET /{id}/messages", handlers.Handler(c.ListMessages))
+	mux.Handle("GET /{id}/topics", authService.ProtectRoute(handlers.Handler(c.ListTopics)))
+	mux.Handle("POST /{id}/topics", authService.ProtectRoute(handlers.Handler(c.CreateTopic)))
+	mux.Handle("GET /{id}/messages", authService.ProtectRoute(handlers.Handler(c.ListMessages)))
 
 	return c
 }
@@ -146,5 +147,64 @@ func (c *ChatController) ListMessages(w http.ResponseWriter, r *http.Request) er
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(messages)
+	return nil
+}
+
+// GetChat returns a chat by ID.
+// @Summary      Get a chat by ID
+// @Description  Returns a chat by ID.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "Chat ID"
+// @Success      200  {object}  repository.Chat
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id} [get]
+// @Security     BearerAuth
+func (c *ChatController) GetChat(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	chat, err := c.chatService.GetChat(r.Context(), chat_id)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(chat)
+	return nil
+}
+
+// CreateTopic creates a new topic in a chat.
+// @Summary      Create a new topic in a chat
+// @Description  Creates a new topic in a chat.
+// @Tags         topics
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "Chat ID"
+// @Param        request body services.CreateTopicDTO true "Topic details"
+// @Success      200  {object}  repository.Topic
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/topics [post]
+// @Security     BearerAuth
+func (c *ChatController) CreateTopic(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	var dto services.CreateTopicDTO
+	if err := dtos.ParseFromBody(r, &dto); err != nil {
+		return err
+	}
+	chat, err := c.chatService.CreateTopic(r.Context(), chat_id, &dto)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(chat)
 	return nil
 }

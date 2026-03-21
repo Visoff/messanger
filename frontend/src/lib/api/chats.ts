@@ -12,6 +12,17 @@ export async function fetchChats(): Promise<Chat[] | ErrorResponse> {
     return data;
 }
 
+export async function fetchChat(id: string): Promise<Chat | ErrorResponse> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/chats/${id}`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const data = await response.json() || [];
+    return data;
+}
+
 export async function createChat(title: string): Promise<Chat | ErrorResponse> {
     const token = localStorage.getItem('token');
     const response = await fetch(`${API_URL}/chats/`, {

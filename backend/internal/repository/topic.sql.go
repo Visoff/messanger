@@ -11,6 +11,38 @@ import (
 	"github.com/google/uuid"
 )
 
+const createChatTopic = `-- name: CreateChatTopic :one
+INSERT INTO topics (
+    chat_id,
+    title,
+    type
+) VALUES (
+    $1, $2, $3
+) RETURNING id, chat_id, title, avatar_url, type, creted_at, updated_at, deleted_at
+`
+
+type CreateChatTopicParams struct {
+	ChatID uuid.UUID `json:"chat_id"`
+	Title  string    `json:"title"`
+	Type   TopicType `json:"type"`
+}
+
+func (q *Queries) CreateChatTopic(ctx context.Context, arg *CreateChatTopicParams) (*Topic, error) {
+	row := q.db.QueryRow(ctx, createChatTopic, arg.ChatID, arg.Title, arg.Type)
+	var i Topic
+	err := row.Scan(
+		&i.ID,
+		&i.ChatID,
+		&i.Title,
+		&i.AvatarUrl,
+		&i.Type,
+		&i.CretedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return &i, err
+}
+
 const listChatTopics = `-- name: ListChatTopics :many
 SELECT id, chat_id, title, avatar_url, type, creted_at, updated_at, deleted_at from topics
 where chat_id = $1

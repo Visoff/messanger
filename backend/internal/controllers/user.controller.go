@@ -18,7 +18,7 @@ func (c *UserController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.mux.ServeHTTP(w, r)
 }
 
-func NewUserController(userService *services.UserService) *UserController {
+func NewUserController(userService *services.UserService, authService *services.AuthService) *UserController {
 	c := &UserController{
 		userService: userService,
 		mux:         nil,
@@ -30,7 +30,7 @@ func NewUserController(userService *services.UserService) *UserController {
 	mux.Handle("POST /register", handlers.Handler(c.RegisterUser))
 	mux.Handle("POST /login", handlers.Handler(c.LoginUser))
 
-	mux.Handle("GET /me", c.userService.ProtectRoute(handlers.Handler(c.GetMe)))
+	mux.Handle("GET /me", authService.ProtectRoute(handlers.Handler(c.GetMe)))
 
 	return c
 }

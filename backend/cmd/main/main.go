@@ -57,8 +57,8 @@ func main() {
 	chat_service := services.NewChatService(repo)
 
 	// controllers
-	user_controller := controllers.NewUserController(user_service)
-	chat_controller := controllers.NewChatController(chat_service)
+	user_controller := controllers.NewUserController(user_service, auth_service)
+	chat_controller := controllers.NewChatController(chat_service, auth_service)
 
 	mux := http.NewServeMux()
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type ErrorResponse struct {
@@ -84,7 +85,7 @@ func NewHTTPValidationError(err map[string]string) error {
 
 func (e *HTTPValidationError) Error() string {
 	b, _ := json.Marshal(e.err)
-	return string(b)
+	return strings.ReplaceAll(string(b), "\"", "\\\"")
 }
 
 func (e *HTTPValidationError) StatusCode() int {

@@ -85,3 +85,37 @@ func (s *ChatService) ListTopics(ctx context.Context, chat_id uuid.UUID) ([]*rep
 func (s *ChatService) ListMessages(ctx context.Context, chat_id uuid.UUID) ([]*repository.Message, error) {
 	return s.repository.ListChatMessages(ctx, chat_id)
 }
+
+func (s *ChatService) GetChat(ctx context.Context, chat_id uuid.UUID) (*repository.Chat, error) {
+	return s.repository.GetChat(ctx, chat_id)
+}
+
+type CreateTopicDTO struct {
+	Title string `json:"title" example:"General Chat"`
+	Type  string `json:"type"  example:"group" enums:"text_topic,voice_topic"`
+}
+
+func (dto *CreateTopicDTO) Validate() error {
+	errors := make(map[string]string)
+	if dto.Title == "" {
+		errors["title"] = "Title is required"
+	}
+	if dto.Type == "" {
+		errors["type"] = "Type is required"
+	}
+	if dto.Type != "text_topic" && dto.Type != "voice_topic" {
+		errors["type"] = "Invalid type"
+	}
+	if len(errors) > 0 {
+		return httperrors.NewHTTPValidationError(errors)
+	}
+	return nil
+}
+
+func (s *ChatService) CreateTopic(ctx context.Context, chat_id uuid.UUID, dto *CreateTopicDTO) (*repository.Topic, error) {
+	return s.repository.CreateChatTopic(ctx, &repository.CreateChatTopicParams{
+		ChatID: chat_id,
+		Title: dto.Title,
+		Type: repository.TopicType(dto.Type),
+	})
+}
