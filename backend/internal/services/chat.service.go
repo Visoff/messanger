@@ -81,3 +81,7 @@ func (s *ChatService) CreateChat(ctx context.Context, dto *CreateChatDTO) (*repo
 func (s *ChatService) ListTopics(ctx context.Context, chat_id uuid.UUID) ([]*repository.Topic, error) {
 	return s.repository.ListChatTopics(ctx, chat_id)
 }
+
+func (s *ChatService) ListMessages(ctx context.Context, chat_id uuid.UUID) ([]*repository.Message, error) {
+	return s.repository.ListChatMessages(ctx, chat_id)
+}

@@ -33,6 +33,8 @@ func NewChatController(chatService *services.ChatService) *ChatController {
 	*/
 
 	mux.Handle("GET /{id}/topics", handlers.Handler(c.ListTopics))
+	//mux.Handle("POST /{id}/topics", handlers.Handler(c.ListTopics))
+	mux.Handle("GET /{id}/messages", handlers.Handler(c.ListMessages))
 
 	return c
 }
@@ -117,5 +119,32 @@ func (c *ChatController) ListTopics(w http.ResponseWriter, r *http.Request) erro
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(topics)
+	return nil
+}
+
+// ListMessages returns a list of all messages in a chat.
+// @Summary      List all messages in a chat
+// @Description  Returns a list of all messages in a chat.
+// @Tags         messages
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "Chat ID"
+// @Success      200  {object}  []repository.Message
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/messages [get]
+// @Security     BearerAuth
+func (c *ChatController) ListMessages(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	messages, err := c.chatService.ListMessages(r.Context(), chat_id)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(messages)
 	return nil
 }
