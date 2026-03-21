@@ -5,6 +5,7 @@ import (
 
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/pkgs/httperrors"
+	"github.com/google/uuid"
 )
 
 type ChatService struct {
@@ -75,4 +76,8 @@ func (s *ChatService) CreateChat(ctx context.Context, dto *CreateChatDTO) (*repo
 		return nil, err
 	}
 	return chat, nil
+}
+
+func (s *ChatService) ListTopics(ctx context.Context, chat_id uuid.UUID) ([]*repository.Topic, error) {
+	return s.repository.ListChatTopics(ctx, chat_id)
 }

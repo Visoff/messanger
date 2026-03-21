@@ -26,6 +26,14 @@ func NewChatController(chatService *services.ChatService) *ChatController {
 	mux.Handle("GET /", handlers.Handler(c.ListChats))
 	mux.Handle("POST /", handlers.Handler(c.CreateChat))
 
+	/*
+	mux.Handle("GET /{id}", handlers.Handler(c.GetChat))
+	mux.Handle("PUT /{id}", handlers.Handler(c.UpdateChat))
+	mux.Handle("DELETE /{id}", handlers.Handler(c.DeleteChat))
+	*/
+
+	mux.Handle("GET /{id}/topics", handlers.Handler(c.ListTopics))
+
 	return c
 }
 
@@ -82,5 +90,32 @@ func (c *ChatController) CreateChat(w http.ResponseWriter, r *http.Request) erro
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(chat)
+	return nil
+}
+
+// ListTopics returns a list of all topics in a chat.
+// @Summary      List all topics in a chat
+// @Description  Returns a list of all topics in a chat.
+// @Tags         topics
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "Chat ID"
+// @Success      200  {object}  []repository.Topic
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/topics [get]
+// @Security     BearerAuth
+func (c *ChatController) ListTopics(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	topics, err := c.chatService.ListTopics(r.Context(), chat_id)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(topics)
 	return nil
 }

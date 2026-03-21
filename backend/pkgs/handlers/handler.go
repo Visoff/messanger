@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Visoff/messanger/pkgs/httperrors"
+	"github.com/google/uuid"
 )
 
 type Handler func(http.ResponseWriter, *http.Request) error
@@ -39,4 +40,16 @@ func (r *RouteMux) Handle(pattern string, handler http.Handler) {
 
 func (r *RouteMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.mux.ServeHTTP(w, req)
+}
+
+func GetParamID(r *http.Request, key string) (uuid.UUID, error) {
+	id := r.PathValue(key)
+	if id == "" {
+		return uuid.Nil, httperrors.NewHTTPNotFoundError("ID not found")
+	}
+	res, err := uuid.Parse(id)
+	if err != nil {
+		return uuid.Nil, httperrors.NewHTTPNotFoundError("ID not found")
+	}
+	return res, nil
 }

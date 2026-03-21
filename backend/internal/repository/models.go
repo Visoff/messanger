@@ -98,6 +98,48 @@ func (ns NullChatType) Value() (driver.Value, error) {
 	return string(ns.ChatType), nil
 }
 
+type TopicType string
+
+const (
+	TopicTypeTextTopic  TopicType = "text_topic"
+	TopicTypeVoiceTopic TopicType = "voice_topic"
+)
+
+func (e *TopicType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TopicType(s)
+	case string:
+		*e = TopicType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TopicType: %T", src)
+	}
+	return nil
+}
+
+type NullTopicType struct {
+	TopicType TopicType `json:"topic_type"`
+	Valid     bool      `json:"valid"` // Valid is true if TopicType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTopicType) Scan(value interface{}) error {
+	if value == nil {
+		ns.TopicType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TopicType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTopicType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TopicType), nil
+}
+
 type Chat struct {
 	ID        uuid.UUID  `json:"id"`
 	Title     string     `json:"title"`
@@ -116,6 +158,17 @@ type ChatMember struct {
 	Role     ChatRole   `json:"role"`
 	JoinedAt time.Time  `json:"joined_at"`
 	LeftAt   *time.Time `json:"left_at"`
+}
+
+type Topic struct {
+	ID        uuid.UUID  `json:"id"`
+	ChatID    uuid.UUID  `json:"chat_id"`
+	Title     string     `json:"title"`
+	AvatarUrl *string    `json:"avatar_url"`
+	Type      TopicType  `json:"type"`
+	CretedAt  time.Time  `json:"creted_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at"`
 }
 
 type User struct {

@@ -122,6 +122,64 @@
                 }
             }
         },
+        "/chats/{id}/topics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a list of all topics in a chat.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "topics"
+                ],
+                "summary": "List all topics in a chat",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/repository.Topic"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/users/login": {
             "post": {
                 "description": "Log in a user.",
@@ -291,6 +349,46 @@
                 "ChatTypePrivate",
                 "ChatTypeGroup",
                 "ChatTypeChannel"
+            ]
+        },
+        "repository.Topic": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "chat_id": {
+                    "type": "string"
+                },
+                "creted_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/repository.TopicType"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "repository.TopicType": {
+            "type": "string",
+            "enum": [
+                "text_topic",
+                "voice_topic"
+            ],
+            "x-enum-varnames": [
+                "TopicTypeTextTopic",
+                "TopicTypeVoiceTopic"
             ]
         },
         "services.AccessToken": {

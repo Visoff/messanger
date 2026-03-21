@@ -31,6 +31,26 @@ func WriteError(w http.ResponseWriter, err error) {
 	}
 }
 
+type HTTPBadRequestError struct {
+	msg string
+}
+
+func NewHTTPBadRequestError(msg string) *HTTPBadRequestError {
+	return &HTTPBadRequestError{msg: msg}
+}
+
+func (e *HTTPBadRequestError) Error() string {
+	return e.msg
+}
+
+func (e *HTTPBadRequestError) StatusCode() int {
+	return 400
+}
+
+func (e *HTTPBadRequestError) Status() string {
+	return "Bad request"
+}
+
 type HTTPBodyParsingError struct {
 	err error
 }
