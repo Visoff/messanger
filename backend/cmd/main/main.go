@@ -55,15 +55,18 @@ func main() {
 	auth_service := services.NewAuthService("secret")
 	user_service := services.NewUserService(repo, auth_service)
 	chat_service := services.NewChatService(repo)
+	topic_service := services.NewTopicService(repo)
 
 	// controllers
 	user_controller := controllers.NewUserController(user_service, auth_service)
 	chat_controller := controllers.NewChatController(chat_service, auth_service)
+	topic_controller := controllers.NewTopicController(topic_service, auth_service)
 
 	mux := http.NewServeMux()
 
 	mux.Handle("/users/", http.StripPrefix("/users", user_controller))
 	mux.Handle("/chats/", http.StripPrefix("/chats", chat_controller))
+	mux.Handle("/topics/", http.StripPrefix("/topics", topic_controller))
 
 	mux.Handle("/docs/swagger.json", http.StripPrefix("/docs", http.FileServerFS(docs.Docs)))
 	mux.Handle("/docs/", httpswagger.Handler(

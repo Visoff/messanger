@@ -110,6 +110,12 @@ definitions:
         example: group
         type: string
     type: object
+  services.CreateMessageDTO:
+    properties:
+      content:
+        example: Hello, world!
+        type: string
+    type: object
   services.CreateTopicDTO:
     properties:
       title:
@@ -289,6 +295,46 @@ paths:
       summary: List all messages in a chat
       tags:
       - messages
+    post:
+      consumes:
+      - application/json
+      description: Creates a new message in a chat.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Message details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateMessageDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Message'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new message in a chat
+      tags:
+      - messages
   /chats/{id}/topics:
     get:
       consumes:
@@ -401,6 +447,46 @@ paths:
       security:
       - BearerAuth: []
       summary: List all messages in a topic
+      tags:
+      - messages
+    post:
+      consumes:
+      - application/json
+      description: Creates a new message in a topic.
+      parameters:
+      - description: Topic ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Message details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateMessageDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Message'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new message in a topic
       tags:
       - messages
   /users/login:

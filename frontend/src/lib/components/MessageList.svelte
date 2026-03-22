@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { fetchMessages } from "$lib/api/messages";
+    import { fetchMessages, sendMessage } from "$lib/api/messages";
     import type { Message } from "$lib/types";
 
     const { chat_id, topic_id }: { chat_id: string, topic_id?: string } = $props();
@@ -19,12 +19,15 @@
 
     function sendMessageEvent(e: SubmitEvent) {
         e.preventDefault();
-        const data = {
-            chat_id,
-            topic_id,
-            content: (e.target as HTMLFormElement).message.value,
-        }
-        console.log(data);
+        (async () => {
+            const resp = await sendMessage(chat_id, topic_id, (e.target as HTMLFormElement).message.value);
+            if ("error" in resp) {
+                console.error(resp.error);
+                return
+            };
+            (e.target as HTMLFormElement).message.value = "";
+            messages = [...messages, resp];
+        })();
     }
 </script>
 

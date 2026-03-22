@@ -35,7 +35,9 @@ func NewChatController(chatService *services.ChatService, authService *services.
 
 	mux.Handle("GET /{id}/topics", authService.ProtectRoute(handlers.Handler(c.ListTopics)))
 	mux.Handle("POST /{id}/topics", authService.ProtectRoute(handlers.Handler(c.CreateTopic)))
+
 	mux.Handle("GET /{id}/messages", authService.ProtectRoute(handlers.Handler(c.ListMessages)))
+	mux.Handle("POST /{id}/messages", authService.ProtectRoute(handlers.Handler(c.CreateMessage)))
 
 	return c
 }
@@ -206,5 +208,37 @@ func (c *ChatController) CreateTopic(w http.ResponseWriter, r *http.Request) err
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(chat)
+	return nil
+}
+
+// CreateMessage creates a new message in a chat.
+// @Summary      Create a new message in a chat
+// @Description  Creates a new message in a chat.
+// @Tags         messages
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "Chat ID"
+// @Param        request body services.CreateMessageDTO true "Message details"
+// @Success      200  {object}  repository.Message
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/messages [post]
+// @Security     BearerAuth
+func (c *ChatController) CreateMessage(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	var dto services.CreateMessageDTO
+	if err := dtos.ParseFromBody(r, &dto); err != nil {
+		return err
+	}
+	msg, err := c.chatService.CreateMessage(r.Context(), chat_id, &dto)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(msg)
 	return nil
 }

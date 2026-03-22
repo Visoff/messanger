@@ -119,3 +119,28 @@ func (s *ChatService) CreateTopic(ctx context.Context, chat_id uuid.UUID, dto *C
 		Type: repository.TopicType(dto.Type),
 	})
 }
+
+type CreateMessageDTO struct {
+	Content string `json:"content" example:"Hello, world!"`
+}
+
+func (dto *CreateMessageDTO) Validate() error {
+	errors := make(map[string]string)
+	if dto.Content == "" {
+		errors["content"] = "Content is required"
+	}
+	if len(errors) > 0 {
+		return httperrors.NewHTTPValidationError(errors)
+	}
+	return nil
+}
+
+func (s *ChatService) CreateMessage(ctx context.Context, chat_id uuid.UUID, dto *CreateMessageDTO) (*repository.Message, error) {
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {return nil, err}
+	return s.repository.CreateChatMessage(ctx, &repository.CreateChatMessageParams{
+		ChatID: chat_id,
+		SenderID: user_id,
+		Content: &dto.Content,
+	})
+}

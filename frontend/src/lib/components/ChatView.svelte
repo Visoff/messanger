@@ -50,16 +50,16 @@
 
 {#if chat}
     <div class="h-full flex-1 flex flex-col">
-        <div class="flex flex-row text-2xl font-bold">
-            {chat.title}
+        <div class="flex flex-row justify-between">
+            <h2 class="text-2xl font-bold">{chat.title}</h2>
+            <button class="text-sm" onclick={createTopicEvent}>New topic</button>
         </div>
-        <div class="flex flex-row flex-1">
+        <div class="flex flex-row flex-1 gap-4">
             {#if topics.length != 0}
             <nav class="flex flex-col">
                 {#each topics as topic(topic.id)}
                     <button onclick={selectTopic(topic.id)}>{topic.title}</button>
                 {/each}
-                <button onclick={createTopicEvent}>create topic</button>
             </nav>
             {/if}
             {#if topics.length == 0 || $selectedTopicId}
