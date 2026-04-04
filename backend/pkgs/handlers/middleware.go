@@ -19,7 +19,9 @@ func MiddlewareChain(middlewares ...Middleware) Middleware {
 func AllowCors(handler Handler) Handler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		return handler(w, r)
 	}
 }

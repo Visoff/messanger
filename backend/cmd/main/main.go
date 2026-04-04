@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/Visoff/messanger/docs"
 	"github.com/Visoff/messanger/internal/controllers"
@@ -39,8 +40,16 @@ import (
 // @description                 Type "Bearer " followed by your JWT token.
 func main() {
 	err := godotenv.Load()
+	if err != nil {
+		log.Println(err)
+	}
+
+	connectionString := os.Getenv("DATABASE_URL")
+	if connectionString == "" {
+		panic("DATABASE_URL is not set")
+	}
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost/postgres?sslmode=disable")
+	pool, err := pgxpool.New(ctx, connectionString)
 
 	if err = pool.Ping(ctx); err != nil {
 		panic(err)
@@ -58,6 +67,7 @@ func main() {
 	user_service := services.NewUserService(repo, auth_service)
 	chat_service := services.NewChatService(repo)
 	topic_service := services.NewTopicService(repo)
+	webrtc_service := services.NewWebRTCService()
 
 	// ws updater
 	ws_updater := websocket.Upgrader{
@@ -70,7 +80,7 @@ func main() {
 	user_controller := controllers.NewUserController(user_service, auth_service)
 	chat_controller := controllers.NewChatController(chat_service, auth_service)
 	topic_controller := controllers.NewTopicController(topic_service, auth_service)
-	conference_controller := controllers.NewWebRTCController(&ws_updater)
+	conference_controller := controllers.NewWebRTCController(&ws_updater, webrtc_service)
 
 	mux := http.NewServeMux()
 
