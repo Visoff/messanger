@@ -12,7 +12,6 @@ import (
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/internal/services"
 	"github.com/Visoff/messanger/pkgs/handlers"
-	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
@@ -67,27 +66,17 @@ func main() {
 	user_service := services.NewUserService(repo, auth_service)
 	chat_service := services.NewChatService(repo)
 	topic_service := services.NewTopicService(repo)
-	webrtc_service := services.NewWebRTCService()
-
-	// ws updater
-	ws_updater := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
-	}
 
 	// controllers
 	user_controller := controllers.NewUserController(user_service, auth_service)
 	chat_controller := controllers.NewChatController(chat_service, auth_service)
 	topic_controller := controllers.NewTopicController(topic_service, auth_service)
-	conference_controller := controllers.NewWebRTCController(&ws_updater, webrtc_service)
 
 	mux := http.NewServeMux()
 
 	mux.Handle("/users/", http.StripPrefix("/users", user_controller))
 	mux.Handle("/chats/", http.StripPrefix("/chats", chat_controller))
 	mux.Handle("/topics/", http.StripPrefix("/topics", topic_controller))
-	mux.Handle("/conference/", http.StripPrefix("/conference", conference_controller))
 
 	mux.Handle("/docs/swagger.json", http.StripPrefix("/docs", http.FileServerFS(docs.Docs)))
 	mux.Handle("/docs/", httpswagger.Handler(

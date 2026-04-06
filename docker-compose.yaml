@@ -7,3 +7,24 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=messanger
+
+  api:
+    build:
+      context: backend
+    ports:
+      - 3478:3478/udp
+      #- 49152-65535:49152-65535/udp
+      - 8080:8080
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger
+      - PUBLIC_IP=192.168.100.6
+    depends_on:
+      - postgres
+
+  webrtc:
+    build:
+      context: webrtc
+    networks:
+      - host # dynamic port allocation is needed for TURN server and p2p webrtc
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger

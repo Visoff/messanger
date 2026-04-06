@@ -21,66 +21,67 @@
         const ws = new WebSocket(
             `${API_URL_WITH_PROTOCOL("ws://", "wss://")}/conference/room/${room_id}`,
         );
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
             ws.onopen = resolve;
+            ws.onerror = reject;
         });
-        const u_stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-        });
+        let u_stream;
+        try {
+            u_stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+            });
+        } catch (e) {
+            console.error("media", e);
+            return;
+        }
         stream = u_stream;
+
+        //const remote_ip = "192.168.100.6";
+        const remote_ip = "158.160.209.129";
 
         const peer = new RTCPeerConnection({
             iceServers: [
+                { urls: `stun:${remote_ip}:3478` },
                 {
-                    urls: ["turn:localhost:3478"],
+                    urls: [`turn:${remote_ip}:3478`],
                     username: "username",
                     credential: "password",
                 },
             ],
-            iceTransportPolicy: "all",
+            iceTransportPolicy: "relay",
         });
 
-        let IceCandidates: RTCIceCandidate[] = [];
+        const iceCandidates: RTCIceCandidate[] = [];
 
         ws.onmessage = async (e) => {
             const data = JSON.parse(e.data);
             console.log(data);
             if (data.type == "offer") {
-                peer.setRemoteDescription(
-                    new RTCSessionDescription(data.offer),
-                );
-                peer.createAnswer().then((a) => {
-                    peer.setLocalDescription(a);
-                    ws.send(
-                        JSON.stringify({
-                            type: "answer",
-                            answer: a,
-                        }),
-                    );
-                });
-                for (const c of IceCandidates) {
-                    await peer.addIceCandidate(c);
-                }
+                console.error("got offer");
             } else if (data.type == "answer") {
                 peer.setRemoteDescription(
                     new RTCSessionDescription(data.answer),
                 );
-                for (const c of IceCandidates) {
-                    await peer.addIceCandidate(c);
+                for (const candidate of iceCandidates) {
+                    await peer.addIceCandidate(candidate);
                 }
+                iceCandidates.length = 0;
             } else if (data.type == "candidate") {
                 if (peer.remoteDescription) {
                     await peer.addIceCandidate(
                         new RTCIceCandidate(data.candidate),
                     );
                 } else {
-                    IceCandidates.push(new RTCIceCandidate(data.candidate));
+                    iceCandidates.push(
+                        new RTCIceCandidate(data.candidate),
+                    );
                 }
             }
         };
 
         peer.onicecandidate = (e) => {
-            if (e.candidate) {
+            if (e.candidate && e.candidate.address) {
+                console.log("send candidate", e.candidate);
                 ws.send(
                     JSON.stringify({
                         type: "candidate",
@@ -97,10 +98,9 @@
                 peer.getStats().then((stats) => {
                     stats.forEach((report) => {
                         if (
-                            report.type === "ice-candidate" &&
-                            report.candidateType === "relay"
+                            report.type === "ice-candidate"
                         ) {
-                            console.log("Relay candidate:", report);
+                            console.log("candidate:", report);
                         }
                     });
                 });
@@ -128,9 +128,10 @@
         };
 
         ws.onclose = () => {
+            console.log("ws closed");
             peer.close();
         };
-
+        
         u_stream.getTracks().forEach((track) => {
             peer.addTrack(track, u_stream);
         });

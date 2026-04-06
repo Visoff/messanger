@@ -22,6 +22,10 @@ func AllowCors(handler Handler) Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return nil
+		}
 		return handler(w, r)
 	}
 }
