@@ -31,6 +31,9 @@
     function selectTopic(topic_id: string) {
         return () => {
             $selectedTopicId = topic_id;
+            const url = new URL(window.location.href);
+            url.searchParams.set("topic_id", topic_id);
+            window.location.href = url.href;
         }
     }
 

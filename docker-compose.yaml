@@ -8,6 +8,11 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=messanger
 
+  valkey:
+    image: valkey/valkey:9.0.3
+    ports:
+      - 6379:6379
+
   api:
     build:
       context: backend
@@ -24,7 +29,7 @@ services:
   webrtc:
     build:
       context: webrtc
-    networks:
-      - host # dynamic port allocation is needed for TURN server and p2p webrtc
+    #networks:
+      #- host # dynamic port allocation is needed for TURN server and p2p webrtc
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger

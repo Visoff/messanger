@@ -10,13 +10,15 @@ import (
 )
 
 type ChatController struct {
-	chatService *services.ChatService
-	mux         *http.ServeMux
+	chatService   *services.ChatService
+	pubsubService *services.PubSubService
+	mux           *http.ServeMux
 }
 
-func NewChatController(chatService *services.ChatService, authService *services.AuthService) *ChatController {
+func NewChatController(chatService *services.ChatService, pubsubService *services.PubSubService, authService *services.AuthService) *ChatController {
 	c := &ChatController{
 		chatService: chatService,
+		pubsubService: pubsubService,
 		mux:         nil,
 	}
 
@@ -29,8 +31,8 @@ func NewChatController(chatService *services.ChatService, authService *services.
 	mux.Handle("GET /{id}", authService.ProtectRoute(handlers.Handler(c.GetChat)))
 
 	/*
-	mux.Handle("PUT /{id}", handlers.Handler(c.UpdateChat))
-	mux.Handle("DELETE /{id}", handlers.Handler(c.DeleteChat))
+		mux.Handle("PUT /{id}", handlers.Handler(c.UpdateChat))
+		mux.Handle("DELETE /{id}", handlers.Handler(c.DeleteChat))
 	*/
 
 	mux.Handle("GET /{id}/topics", authService.ProtectRoute(handlers.Handler(c.ListTopics)))
@@ -83,7 +85,7 @@ func (c *ChatController) ListChats(w http.ResponseWriter, r *http.Request) error
 // @Security     BearerAuth
 func (c *ChatController) CreateChat(w http.ResponseWriter, r *http.Request) error {
 	var dto services.CreateChatDTO
-	
+
 	if err := dtos.ParseFromBody(r, &dto); err != nil {
 		return err
 	}
@@ -238,6 +240,9 @@ func (c *ChatController) CreateMessage(w http.ResponseWriter, r *http.Request) e
 	if err != nil {
 		return err
 	}
+
+	c.pubsubService.Publish(r.Context(), "messanger", msg)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(msg)
 	return nil

@@ -32,6 +32,9 @@
     function selectChatEvent(chat_id: string) {
         return () => {
             $selectedChatId = chat_id
+            const url = new URL(location.href);
+            url.searchParams.set("chat_id", chat_id);
+            history.pushState(null, "", url);
         }
     }
 </script>

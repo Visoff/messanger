@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { API_URL } from "$lib/api/env";
     import ChatList from "$lib/components/ChatList.svelte";
     import ChatView from "$lib/components/ChatView.svelte";
     import { selectedChatId } from "$lib/stores/chat";
@@ -11,6 +12,17 @@
         } else {
             console.log(token);
         }
+
+        const url = new URL(window.location.href);
+        const chat_id = url.searchParams.get("chat_id");
+        if (chat_id) {
+            selectedChatId.set(chat_id);
+        }
+
+        const stream = new EventSource(`${API_URL}/pubsub/sse`);
+        stream.addEventListener("message", (e) => {
+            console.log(e.data);
+        });
     })
 
     function logout() {

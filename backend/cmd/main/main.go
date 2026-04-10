@@ -66,17 +66,23 @@ func main() {
 	user_service := services.NewUserService(repo, auth_service)
 	chat_service := services.NewChatService(repo)
 	topic_service := services.NewTopicService(repo)
+	pubsub_service, err := services.NewPubSubService()
+	if err != nil {
+		panic(err)
+	}
 
 	// controllers
 	user_controller := controllers.NewUserController(user_service, auth_service)
-	chat_controller := controllers.NewChatController(chat_service, auth_service)
+	chat_controller := controllers.NewChatController(chat_service, pubsub_service, auth_service)
 	topic_controller := controllers.NewTopicController(topic_service, auth_service)
+	pubsub_controller := controllers.NewPubSubController(pubsub_service, auth_service)
 
 	mux := http.NewServeMux()
 
 	mux.Handle("/users/", http.StripPrefix("/users", user_controller))
 	mux.Handle("/chats/", http.StripPrefix("/chats", chat_controller))
 	mux.Handle("/topics/", http.StripPrefix("/topics", topic_controller))
+	mux.Handle("/pubsub/", http.StripPrefix("/pubsub", pubsub_controller))
 
 	mux.Handle("/docs/swagger.json", http.StripPrefix("/docs", http.FileServerFS(docs.Docs)))
 	mux.Handle("/docs/", httpswagger.Handler(
@@ -85,8 +91,8 @@ func main() {
 
 	log.Println("Server is running on port 8080")
 	err = http.ListenAndServe(":8080", handlers.MiddlewareChain(
-		handlers.AllowCors,
 		handlers.Logging(log.Default()),
+		handlers.AllowCors,
 	)(handlers.ToErrorHandler(mux)))
 
 	if err != nil {
