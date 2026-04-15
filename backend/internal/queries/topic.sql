@@ -10,3 +10,7 @@ INSERT INTO topics (
 ) VALUES (
     $1, $2, $3
 ) RETURNING *;
+
+-- name: GetTopic :one
+SELECT * from topics
+where id = $1;

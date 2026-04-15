@@ -24,11 +24,11 @@ func NewTopicController(topicService *services.TopicService, auth_service *servi
 	c.mux = mux
 
 	/*
-	mux.Handle("GET /{id}", handlers.Handler(c.GetTopic))
 	mux.Handle("PUT /{id}", handlers.Handler(c.UpdateTopic))
 	mux.Handle("DELETE /{id}", handlers.Handler(c.DeleteTopic))
 	*/
 
+	mux.Handle("GET /{id}", auth_service.ProtectRoute(handlers.Handler(c.GetTopic)))
 	mux.Handle("GET /{id}/messages", auth_service.ProtectRoute(handlers.Handler(c.ListMessages)))
 	mux.Handle("POST /{id}/messages", auth_service.ProtectRoute(handlers.Handler(c.CreateMessage)))
 
@@ -95,5 +95,32 @@ func (c *TopicController) CreateMessage(w http.ResponseWriter, r *http.Request) 
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(msg)
+	return nil
+}
+
+// GetTopic returns a topic by ID.
+// @Summary      Get a topic by ID
+// @Description  Returns a topic by ID.
+// @Tags         topics
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "Topic ID"
+// @Success      200  {object}  repository.Topic
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /topics/{id} [get]
+// @Security     BearerAuth
+func (c *TopicController) GetTopic(w http.ResponseWriter, r *http.Request) error {
+	topic_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	topic, err := c.topicService.GetTopic(r.Context(), topic_id)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(topic)
 	return nil
 }

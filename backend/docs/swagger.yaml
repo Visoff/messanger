@@ -412,6 +412,41 @@ paths:
       summary: Create a new topic in a chat
       tags:
       - topics
+  /topics/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Returns a topic by ID.
+      parameters:
+      - description: Topic ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Topic'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a topic by ID
+      tags:
+      - topics
   /topics/{id}/messages:
     get:
       consumes:

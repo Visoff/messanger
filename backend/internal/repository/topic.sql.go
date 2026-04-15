@@ -43,6 +43,27 @@ func (q *Queries) CreateChatTopic(ctx context.Context, arg *CreateChatTopicParam
 	return &i, err
 }
 
+const getTopic = `-- name: GetTopic :one
+SELECT id, chat_id, title, avatar_url, type, creted_at, updated_at, deleted_at from topics
+where id = $1
+`
+
+func (q *Queries) GetTopic(ctx context.Context, id uuid.UUID) (*Topic, error) {
+	row := q.db.QueryRow(ctx, getTopic, id)
+	var i Topic
+	err := row.Scan(
+		&i.ID,
+		&i.ChatID,
+		&i.Title,
+		&i.AvatarUrl,
+		&i.Type,
+		&i.CretedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return &i, err
+}
+
 const listChatTopics = `-- name: ListChatTopics :many
 SELECT id, chat_id, title, avatar_url, type, creted_at, updated_at, deleted_at from topics
 where chat_id = $1

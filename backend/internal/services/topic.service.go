@@ -28,3 +28,7 @@ func (s *TopicService) CreateMessage(ctx context.Context, topic_id uuid.UUID, dt
 		Content: &dto.Content,
 	})
 }
+
+func (s *TopicService) GetTopic(ctx context.Context, topic_id uuid.UUID) (*repository.Topic, error) {
+	return s.repository.GetTopic(ctx, topic_id)
+}
