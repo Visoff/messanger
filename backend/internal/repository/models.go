@@ -172,6 +172,14 @@ type Message struct {
 	DeletedAt      *time.Time `json:"deleted_at"`
 }
 
+type PushSubscription struct {
+	ID       uuid.UUID `json:"id"`
+	UserID   uuid.UUID `json:"user_id"`
+	Endpoint string    `json:"endpoint"`
+	P256dh   string    `json:"p256dh"`
+	Auth     string    `json:"auth"`
+}
+
 type Topic struct {
 	ID        uuid.UUID  `json:"id"`
 	ChatID    uuid.UUID  `json:"chat_id"`

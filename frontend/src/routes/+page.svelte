@@ -8,30 +8,53 @@
     import { selectedChatId, selectedTopicId } from "$lib/stores/chat";
     import { onMount } from "svelte";
 
+    async function subscribeToPush() {
+        const registration = await navigator.serviceWorker.register("/scripts/sw.js");
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") return;
+
+        const vapidPublicKey = await fetch(
+            `${API_URL}/pubsub/push/pubkey`,
+        ).then((r) => r.text());
+        console.log(vapidPublicKey);
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: vapidPublicKey,
+        });
+        const token = localStorage.getItem("token");
+        await fetch(`${API_URL}/pubsub/push/subscribe`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(subscription),
+        });
+    }
     let title: string = $state("");
 
     $effect(() => {
         (async () => {
             if (!$selectedChatId) {
-                return
+                return;
             }
             if (!$selectedTopicId) {
                 const resp = await fetchChat($selectedChatId);
                 if ("error" in resp) {
                     console.error(resp.error);
-                    return
+                    return;
                 }
                 title = resp.title;
             } else {
                 const resp = await fetchTopic($selectedTopicId);
                 if ("error" in resp) {
                     console.error(resp.error);
-                    return
+                    return;
                 }
                 title = resp.title;
             }
         })();
-    })
+    });
 
     onMount(() => {
         const token = localStorage.getItem("token");
@@ -56,7 +79,7 @@
         stream.addEventListener("message", (e) => {
             console.log(e.data);
         });
-    })
+    });
 
     async function createChatEvent() {
         const title = prompt("Chat title");
@@ -76,7 +99,11 @@
         <div class="overflow-hidden flex flex-col gap-4 items-start">
             <h1 class="text-2xl font-bold">Chats</h1>
             <ChatList />
-            <button class="text-2xl font-bold" type="button" onclick={createChatEvent()}>+</button>
+            <button
+                class="text-2xl font-bold"
+                type="button"
+                onclick={createChatEvent()}>+</button
+            >
         </div>
         <TopicList chat_id={$selectedChatId} />
     </nav>
@@ -84,7 +111,11 @@
     <div class="h-full flex-1 flex flex-col">
         <h1 class="text-2xl font-bold">{title}</h1>
         {#if $selectedChatId}
-            <MessageList chat_id={$selectedChatId} topic_id={$selectedTopicId} />
+            <MessageList
+                chat_id={$selectedChatId}
+                topic_id={$selectedTopicId}
+            />
         {/if}
     </div>
+    <button onclick={subscribeToPush}>Subscribe to push</button>
 </main>
