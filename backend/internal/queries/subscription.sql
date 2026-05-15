@@ -4,3 +4,7 @@ VALUES ($1, $2, $3, $4);
 
 -- name: GetAllSubscriptions :many
 SELECT * FROM push_subscriptions;
+
+-- name: GetUserSubscriptions :many
+SELECT * FROM push_subscriptions
+WHERE user_id = $1;

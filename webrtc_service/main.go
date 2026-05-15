@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 
 	"github.com/gorilla/websocket"
@@ -17,6 +18,11 @@ func main() {
 		log.Println(err)
 	}
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	service := NewWebRTCService()
 
 	ws_updater := websocket.Upgrader{
@@ -27,7 +33,7 @@ func main() {
 
 	controller := NewWebRTCController(&ws_updater, service)
 	http.Handle("/", controller)
-	err = http.ListenAndServe(":8080", nil)
+	err = http.ListenAndServe(":" + port, nil)
 	if err != nil {
 		log.Println(err)
 	}

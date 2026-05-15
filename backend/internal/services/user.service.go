@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/pkgs/httperrors"
+	"github.com/google/uuid"
 )
 
 type UserService struct {
@@ -20,6 +22,30 @@ func NewUserService(repository *repository.Queries, authService *AuthService) *U
 
 type AccessToken struct {
 	Token string `json:"token"`
+}
+
+type DisplayUser struct {
+	ID           uuid.UUID  `json:"id"`
+	Username     string     `json:"username"`
+	AvatarUrl    *string    `json:"avatar_url"`
+	Metadata     []byte     `json:"metadata"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	DeletedAt    *time.Time `json:"deleted_at"`
+	LastSeenAt   time.Time  `json:"last_seen_at"`
+}
+
+func (s *UserService)NewDisplayUser(user *repository.User) *DisplayUser {
+	return &DisplayUser{
+		ID:           user.ID,
+		Username:     user.Username,
+		AvatarUrl:    user.AvatarUrl,
+		Metadata:     user.Metadata,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		DeletedAt:    user.DeletedAt,
+		LastSeenAt:   user.LastSeenAt,
+	}
 }
 
 type RegisterUserDTO struct {
@@ -87,6 +113,14 @@ func (s *UserService) GetMe(r *http.Request) (*repository.User, error) {
 		return nil, httperrors.NewHTTPUnauthorizedError("Unauthorized")
 	}
 	user, err := s.repository.GetUserById(r.Context(), id)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("User not found")
+	}
+	return user, nil
+}
+
+func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*repository.User, error) {
+	user, err := s.repository.GetUserByUsername(ctx, username)
 	if err != nil {
 		return nil, httperrors.NewHTTPNotFoundError("User not found")
 	}

@@ -62,3 +62,34 @@ func (q *Queries) GetAllSubscriptions(ctx context.Context) ([]*PushSubscription,
 	}
 	return items, nil
 }
+
+const getUserSubscriptions = `-- name: GetUserSubscriptions :many
+SELECT id, user_id, endpoint, p256dh, auth FROM push_subscriptions
+WHERE user_id = $1
+`
+
+func (q *Queries) GetUserSubscriptions(ctx context.Context, userID uuid.UUID) ([]*PushSubscription, error) {
+	rows, err := q.db.Query(ctx, getUserSubscriptions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*PushSubscription
+	for rows.Next() {
+		var i PushSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Endpoint,
+			&i.P256dh,
+			&i.Auth,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

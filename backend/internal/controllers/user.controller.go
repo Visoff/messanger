@@ -32,6 +32,10 @@ func NewUserController(userService *services.UserService, authService *services.
 
 	mux.Handle("GET /me", authService.ProtectRoute(handlers.Handler(c.GetMe)))
 
+	mux.Handle("GET /username/{username}", handlers.Handler(c.GetUserByUsername))
+
+	//mux.Handle("GET /", handlers.Handler(c.Search))
+
 	return c
 }
 
@@ -95,6 +99,17 @@ func (c *UserController) LoginUser(w http.ResponseWriter, r *http.Request) error
 	return nil
 }
 
+// GetMe gets the current user.
+// @Summary      Get current user
+// @Description  Get the current user.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  services.DisplayUser
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /users/me [get]
 func (c *UserController) GetMe(w http.ResponseWriter, r *http.Request) error {
 	user, err := c.userService.GetMe(r)
 	if err != nil {
@@ -102,6 +117,32 @@ func (c *UserController) GetMe(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(c.userService.NewDisplayUser(user))
+	return nil
+}
+
+// GetUserByUsername gets a user by username.
+// @Summary      Get user by username
+// @Description  Get a user by username.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "Username"
+// @Success      200  {object}  services.DisplayUser
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /users/username/{username} [get]
+func (c *UserController) GetUserByUsername(w http.ResponseWriter, r *http.Request) error {
+	username, err := handlers.GetParamString(r, "username")
+	if err != nil {
+		return err
+	}
+	user, err := c.userService.GetUserByUsername(r.Context(), username)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(c.userService.NewDisplayUser(user))
 	return nil
 }

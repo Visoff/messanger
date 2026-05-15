@@ -102,13 +102,6 @@ definitions:
       title:
         example: General Chat
         type: string
-      type:
-        enum:
-        - private
-        - group
-        - channel
-        example: group
-        type: string
     type: object
   services.CreateMessageDTO:
     properties:
@@ -126,6 +119,27 @@ definitions:
         - text_topic
         - voice_topic
         example: group
+        type: string
+    type: object
+  services.DisplayUser:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      id:
+        type: string
+      last_seen_at:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      updated_at:
+        type: string
+      username:
         type: string
     type: object
   services.LoginUserDTO:
@@ -558,6 +572,33 @@ paths:
       summary: Login a user
       tags:
       - users
+  /users/me:
+    get:
+      consumes:
+      - application/json
+      description: Get the current user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.DisplayUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      summary: Get current user
+      tags:
+      - users
   /users/register:
     post:
       consumes:
@@ -590,6 +631,39 @@ paths:
           schema:
             $ref: '#/definitions/httperrors.ErrorResponse'
       summary: Register a user
+      tags:
+      - users
+  /users/username/{username}:
+    get:
+      consumes:
+      - application/json
+      description: Get a user by username.
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.DisplayUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      summary: Get user by username
       tags:
       - users
 securityDefinitions:

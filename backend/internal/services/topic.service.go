@@ -32,3 +32,7 @@ func (s *TopicService) CreateMessage(ctx context.Context, topic_id uuid.UUID, dt
 func (s *TopicService) GetTopic(ctx context.Context, topic_id uuid.UUID) (*repository.Topic, error) {
 	return s.repository.GetTopic(ctx, topic_id)
 }
+
+func (s *TopicService) ListTopicMembers(ctx context.Context, topic_id uuid.UUID) ([]*repository.User, error) {
+	return s.repository.ListTopicMembers(ctx, topic_id)
+}

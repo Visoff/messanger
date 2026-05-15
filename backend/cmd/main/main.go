@@ -66,16 +66,16 @@ func main() {
 	user_service := services.NewUserService(repo, auth_service)
 	chat_service := services.NewChatService(repo)
 	topic_service := services.NewTopicService(repo)
-	webpush_service := services.NewWebPushService(repo)
 	pubsub_service, err := services.NewPubSubService()
+	webpush_service := services.NewWebPushService(repo, pubsub_service)
 	if err != nil {
 		panic(err)
 	}
 
 	// controllers
 	user_controller := controllers.NewUserController(user_service, auth_service)
-	chat_controller := controllers.NewChatController(chat_service, pubsub_service, auth_service)
-	topic_controller := controllers.NewTopicController(topic_service, auth_service)
+	chat_controller := controllers.NewChatController(chat_service, user_service, pubsub_service, webpush_service, auth_service)
+	topic_controller := controllers.NewTopicController(topic_service, user_service, webpush_service, auth_service)
 	pubsub_controller := controllers.NewPubSubController(pubsub_service, webpush_service, auth_service)
 
 	mux := http.NewServeMux()

@@ -36,8 +36,7 @@
         }
         stream = u_stream;
 
-        //const remote_ip = "192.168.100.6";
-        const remote_ip = "158.160.209.129";
+        const remote_ip = import.meta.env.VITE_WEBRTC_SERVER_IP
 
         const peer = new RTCPeerConnection({
             iceServers: [

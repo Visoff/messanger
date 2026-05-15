@@ -4,6 +4,17 @@ export type ErrorResponse = {
     message: string
 }
 
+export type User = {
+    id: string,
+    username: string,
+    avatar_url: string,
+    metadata: string,
+    created_at: Date,
+    updated_at: Date,
+    deleted_at: Date,
+    last_seen_at: Date
+}
+
 export type ChatType = 'private' | 'group' | 'channel';
 
 export type Chat = {

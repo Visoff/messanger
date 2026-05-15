@@ -51,6 +51,13 @@ func (r *RouteMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.mux.ServeHTTP(w, req)
 }
 
+func GetParamString(r *http.Request, key string) (string, error) {
+	res := r.PathValue(key)
+	if res == "" {
+		return "", httperrors.NewHTTPNotFoundError("value not found")
+	}
+	return res, nil
+}
 func GetParamID(r *http.Request, key string) (uuid.UUID, error) {
 	id := r.PathValue(key)
 	if id == "" {

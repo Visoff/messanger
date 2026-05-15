@@ -1,5 +1,5 @@
 import { API_URL } from "./env";
-import type { ErrorResponse } from '../types';
+import type { User, ErrorResponse } from '../types';
 
 export async function login(creds: {username: string, password: string}): Promise<{token: string} | ErrorResponse> {
     const response = await fetch(`${API_URL}/users/login`, {
@@ -20,6 +20,17 @@ export async function register(creds: {username: string, password: string}): Pro
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(creds),
+    });
+    const data = await response.json();
+    return data;
+}
+
+export async function getMe(): Promise<User | ErrorResponse> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/users/me`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
     });
     const data = await response.json();
     return data;

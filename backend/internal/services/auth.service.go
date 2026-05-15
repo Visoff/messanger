@@ -60,7 +60,12 @@ func (s *AuthService) ProtectRoute(handler handlers.Handler) handlers.Handler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		token := r.Header.Get("Authorization")
 		if token == "" {
-			return httperrors.NewHTTPUnauthorizedError("Unauthorized")
+			if r.URL.Query().Get("token") != "" {
+				token = r.URL.Query().Get("token")
+				token = "Bearer " + token
+			} else {
+				return httperrors.NewHTTPUnauthorizedError("Unauthorized")
+			}
 		}
 		if !strings.HasPrefix(token, "Bearer ") {
 			return httperrors.NewHTTPUnauthorizedError("Unauthorized")

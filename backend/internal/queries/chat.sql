@@ -3,6 +3,11 @@ SELECT chats.* from chats
 left join chat_members on chat_members.chat_id = chats.id
 where chat_members.user_id = $1;
 
+-- name: ListChatMembers :many
+SELECT users.* from users
+join chat_members on chat_members.user_id = users.id
+where chat_members.chat_id = $1;
+
 -- name: GetChat :one
 SELECT * FROM chats
 WHERE id = $1;

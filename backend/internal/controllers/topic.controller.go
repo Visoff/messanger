@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -10,22 +11,26 @@ import (
 )
 
 type TopicController struct {
-	topicService *services.TopicService
-	mux          *http.ServeMux
+	topicService   *services.TopicService
+	userService    *services.UserService
+	webpushService *services.WebPushService
+	mux            *http.ServeMux
 }
 
-func NewTopicController(topicService *services.TopicService, auth_service *services.AuthService) *TopicController {
+func NewTopicController(topicService *services.TopicService, userService *services.UserService, webpushService *services.WebPushService, auth_service *services.AuthService) *TopicController {
 	c := &TopicController{
 		topicService: topicService,
-		mux:         nil,
+		userService:  userService,
+		webpushService: webpushService,
+		mux:          nil,
 	}
 
 	mux := http.NewServeMux()
 	c.mux = mux
 
 	/*
-	mux.Handle("PUT /{id}", handlers.Handler(c.UpdateTopic))
-	mux.Handle("DELETE /{id}", handlers.Handler(c.DeleteTopic))
+		mux.Handle("PUT /{id}", handlers.Handler(c.UpdateTopic))
+		mux.Handle("DELETE /{id}", handlers.Handler(c.DeleteTopic))
 	*/
 
 	mux.Handle("GET /{id}", auth_service.ProtectRoute(handlers.Handler(c.GetTopic)))
@@ -93,6 +98,19 @@ func (c *TopicController) CreateMessage(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		return err
 	}
+
+	usrs, err := c.topicService.ListTopicMembers(r.Context(), topic_id)
+	if err != nil {
+		return err
+	}
+
+	me, err := c.userService.GetMe(r)
+	if err != nil {
+		return err
+	}
+
+	go c.webpushService.SendNewMessageNotification(context.Background(), msg, usrs, me)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(msg)
 	return nil

@@ -1,32 +1,40 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/Visoff/messanger/internal/services"
 	"github.com/Visoff/messanger/pkgs/dtos"
 	"github.com/Visoff/messanger/pkgs/handlers"
+	"github.com/Visoff/messanger/pkgs/httperrors"
+	"github.com/google/uuid"
 )
 
 type ChatController struct {
-	chatService   *services.ChatService
-	pubsubService *services.PubSubService
-	mux           *http.ServeMux
+	chatService    *services.ChatService
+	userService    *services.UserService
+	pubsubService  *services.PubSubService
+	webpushService *services.WebPushService
+	mux            *http.ServeMux
 }
 
-func NewChatController(chatService *services.ChatService, pubsubService *services.PubSubService, authService *services.AuthService) *ChatController {
+func NewChatController(chatService *services.ChatService, userService *services.UserService, pubsubService *services.PubSubService, webpushService *services.WebPushService, authService *services.AuthService) *ChatController {
 	c := &ChatController{
-		chatService: chatService,
-		pubsubService: pubsubService,
-		mux:         nil,
+		chatService:    chatService,
+		pubsubService:  pubsubService,
+		userService:    userService,
+		webpushService: webpushService,
+		mux:            nil,
 	}
 
 	mux := http.NewServeMux()
 	c.mux = mux
 
 	mux.Handle("GET /", authService.ProtectRoute(handlers.Handler(c.ListChats)))
-	mux.Handle("POST /", authService.ProtectRoute(handlers.Handler(c.CreateChat)))
+	mux.Handle("POST /group", authService.ProtectRoute(handlers.Handler(c.CreateChat)))
+	mux.Handle("POST /private", authService.ProtectRoute(handlers.Handler(c.CreatePrivateChat)))
 
 	mux.Handle("GET /{id}", authService.ProtectRoute(handlers.Handler(c.GetChat)))
 
@@ -40,6 +48,9 @@ func NewChatController(chatService *services.ChatService, pubsubService *service
 
 	mux.Handle("GET /{id}/messages", authService.ProtectRoute(handlers.Handler(c.ListMessages)))
 	mux.Handle("POST /{id}/messages", authService.ProtectRoute(handlers.Handler(c.CreateMessage)))
+
+	mux.Handle("POST /{id}/invite/{user_id}", authService.ProtectRoute(handlers.Handler(c.InviteUser)))
+	mux.Handle("POST /{id}/invitation", authService.ProtectRoute(handlers.Handler(c.CreateInvitation)))
 
 	return c
 }
@@ -241,9 +252,66 @@ func (c *ChatController) CreateMessage(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
-	c.pubsubService.Publish(r.Context(), "messanger", msg)
+	me, err := c.userService.GetMe(r)
+	if err != nil {
+		return err
+	}
+
+	usrs, err := c.chatService.ListChatMembers(r.Context(), chat_id)
+	if err != nil {
+		return err
+	}
+
+	go c.webpushService.SendNewMessageNotification(context.Background(), msg, usrs, me)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(msg)
+	return nil
+}
+
+func (c *ChatController) CreateInvitation(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	id, err := c.chatService.CreateInvitation(r.Context(), chat_id)
+	if err != nil {
+		return err
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(id)
+	return nil
+}
+
+func (c *ChatController) InviteUser(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	user_id, err := handlers.GetParamID(r, "user_id")
+	if err != nil {
+		return err
+	}
+
+	err = c.chatService.InviteUser(r.Context(), chat_id, user_id)
+	return err
+}
+
+func (c *ChatController) CreatePrivateChat(w http.ResponseWriter, r *http.Request) error {
+	user1_id, err := services.ExtractUserId(r.Context())
+	if err != nil {
+		return err
+	}
+	user2_id, err := uuid.Parse(r.URL.Query().Get("user_id"))
+	if err != nil {
+		return httperrors.NewHTTPBadRequestError("invalid user_id")
+	}
+	chat, err := c.chatService.CreatePrivateChat(r.Context(), user1_id, user2_id)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(chat)
 	return nil
 }
