@@ -25,13 +25,27 @@ export async function fetchChat(id: string): Promise<Chat | ErrorResponse> {
 
 export async function createChat(title: string): Promise<Chat | ErrorResponse> {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/chats/`, {
+    const response = await fetch(`${API_URL}/chats/group`, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ title, type: "private" }),
+        body: JSON.stringify({ title }),
+    });
+    const data = await response.json();
+    return data;
+}
+
+export async function InviteUserToChat(chat_id: string, user_id: string): Promise<Chat | ErrorResponse> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/chats/${chat_id}/invite`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id }),
     });
     const data = await response.json();
     return data;

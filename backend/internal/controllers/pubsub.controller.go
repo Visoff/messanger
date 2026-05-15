@@ -25,7 +25,7 @@ func NewPubSubController(pubsubService *services.PubSubService, webpushService *
 	mux := http.NewServeMux()
 	c.mux = mux
 
-	mux.Handle("GET /sse", handlers.Handler(c.SSE))
+	mux.Handle("GET /sse", authService.ProtectRoute(handlers.Handler(c.SSE)))
 	mux.Handle("GET /push/pubkey", handlers.Handler(c.GetPushPubKey))
 	mux.Handle("POST /push/subscribe", authService.ProtectRoute(handlers.Handler(c.SubscribePush)))
 	mux.Handle("POST /push/notify", handlers.Handler(c.NotifyPush))
@@ -38,7 +38,11 @@ func (c *PubSubController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *PubSubController) SSE(w http.ResponseWriter, r *http.Request) error {
-	ch, err := c.pubsubService.Subscribe(r.Context(), "messanger")
+	user_id, err := services.ExtractUserId(r.Context())
+	if err != nil {
+		return err
+	}
+	ch, err := c.pubsubService.Subscribe(r.Context(), user_id.String())
 	if err != nil {
 		return err
 	}

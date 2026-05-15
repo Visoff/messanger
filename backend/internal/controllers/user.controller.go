@@ -32,6 +32,10 @@ func NewUserController(userService *services.UserService, authService *services.
 
 	mux.Handle("GET /me", authService.ProtectRoute(handlers.Handler(c.GetMe)))
 
+	mux.Handle("GET /username/{username}", handlers.Handler(c.GetUserByUsername))
+
+	//mux.Handle("GET /", handlers.Handler(c.Search))
+
 	return c
 }
 
@@ -101,6 +105,20 @@ func (c *UserController) GetMe(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
+	return nil
+}
+
+func (c *UserController) GetUserByUsername(w http.ResponseWriter, r *http.Request) error {
+	username, err := handlers.GetParamString(r, "username")
+	if err != nil {
+		return err
+	}
+	user, err := c.userService.GetUserByUsername(r.Context(), username)
+	if err != nil {
+		return err
+	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(user)
 	return nil

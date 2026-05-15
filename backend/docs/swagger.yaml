@@ -102,13 +102,6 @@ definitions:
       title:
         example: General Chat
         type: string
-      type:
-        enum:
-        - private
-        - group
-        - channel
-        example: group
-        type: string
     type: object
   services.CreateMessageDTO:
     properties:

@@ -160,6 +160,15 @@ type ChatMember struct {
 	LeftAt   *time.Time `json:"left_at"`
 }
 
+type Invitation struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"user_id"`
+	ChatID    uuid.UUID  `json:"chat_id"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at"`
+}
+
 type Message struct {
 	ID             uuid.UUID  `json:"id"`
 	ChatID         uuid.UUID  `json:"chat_id"`

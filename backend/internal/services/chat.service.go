@@ -28,19 +28,12 @@ func (s *ChatService) ListChats(ctx context.Context) ([]*repository.Chat, error)
 
 type CreateChatDTO struct {
 	Title string `json:"title" example:"General Chat"`
-	Type  string `json:"type"  example:"group" enums:"private,group,channel"`
 }
 
 func (dto *CreateChatDTO) Validate() error {
 	errors := make(map[string]string)
 	if dto.Title == "" {
 		errors["title"] = "Title is required"
-	}
-	if dto.Type == "" {
-		errors["type"] = "Type is required"
-	}
-	if dto.Type != "private" && dto.Type != "group" && dto.Type != "channel" {
-		errors["type"] = "Invalid type"
 	}
 	if len(errors) > 0 {
 		return httperrors.NewHTTPValidationError(errors)
@@ -58,7 +51,7 @@ func (s *ChatService) CreateChat(ctx context.Context, dto *CreateChatDTO) (*repo
 	}
 	chat, err := qtx.CreateChat(ctx, &repository.CreateChatParams{
 		Title: dto.Title,
-		Type: repository.ChatType(dto.Type),
+		Type: repository.ChatTypeGroup,
 	})
 	if err != nil {
 		return nil, err
@@ -143,4 +136,54 @@ func (s *ChatService) CreateMessage(ctx context.Context, chat_id uuid.UUID, dto 
 		SenderID: user_id,
 		Content: &dto.Content,
 	})
+}
+
+func (s *ChatService) InviteUser(ctx context.Context, chat_id uuid.UUID, user_id uuid.UUID) error {
+	return s.repository.AddUserToChat(ctx, &repository.AddUserToChatParams{
+		ChatID: chat_id,
+		UserID: user_id,
+		Role: repository.ChatRoleMember,
+	})
+}
+
+func (s *ChatService) CreateInvitation(ctx context.Context, chat_id uuid.UUID) (*uuid.UUID, error) {
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {return nil, err}
+	id, err := s.repository.CreateChatInvitation(ctx, &repository.CreateChatInvitationParams{
+		ChatID: chat_id,
+		UserID: user_id,
+	})
+	if err != nil {return nil, err}
+	return &id, nil
+}
+
+func (s *ChatService) ListChatMembers(ctx context.Context, chat_id uuid.UUID) ([]*repository.User, error) {
+	return s.repository.ListChatMembers(ctx, chat_id)
+}
+
+func (s *ChatService) CreatePrivateChat(ctx context.Context, user1_id, user2_id uuid.UUID) (*repository.Chat, error) {
+	chat, err := s.repository.CreateChat(ctx, &repository.CreateChatParams{
+		Title: "",
+		Type: repository.ChatTypePrivate,
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = s.repository.AddUserToChat(ctx, &repository.AddUserToChatParams{
+		ChatID: chat.ID,
+		UserID: user1_id,
+		Role: repository.ChatRoleAdmin,
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = s.repository.AddUserToChat(ctx, &repository.AddUserToChatParams{
+		ChatID: chat.ID,
+		UserID: user2_id,
+		Role: repository.ChatRoleAdmin,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return chat, nil
 }

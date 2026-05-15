@@ -109,3 +109,29 @@ func (s *WebPushService) SendNotification(ctx context.Context, dto *WebPushNotif
 	}
 	return nil
 }
+
+func (s *WebPushService) SendUserNotification(ctx context.Context, user_id uuid.UUID, dto *WebPushNotificationDTO) error {
+	subscriptions, err := s.repository.GetUserSubscriptions(ctx, user_id)
+	if err != nil {
+		return err
+	}
+	msg, _ := json.Marshal(dto)
+	for _, subscription := range subscriptions {
+		_, err := webpush.SendNotificationWithContext(ctx, msg, &webpush.Subscription{
+			Keys: webpush.Keys{
+				Auth:   subscription.Auth,
+				P256dh: subscription.P256dh,
+			},
+			Endpoint: subscription.Endpoint,
+		}, &webpush.Options{
+			Subscriber:      "mailto:ikalinin01@mail.ru",
+			VAPIDPublicKey:  s.vapidPublicKey,
+			VAPIDPrivateKey: s.vapidPrivateKey,
+			TTL:             60,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

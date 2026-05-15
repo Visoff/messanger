@@ -855,15 +855,6 @@ const docTemplate = `{
                 "title": {
                     "type": "string",
                     "example": "General Chat"
-                },
-                "type": {
-                    "type": "string",
-                    "enum": [
-                        "private",
-                        "group",
-                        "channel"
-                    ],
-                    "example": "group"
                 }
             }
         },

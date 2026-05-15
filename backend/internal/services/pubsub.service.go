@@ -41,3 +41,11 @@ func (s *PubSubService) Publish(ctx context.Context, topic string, input any) er
 	}
 	return s.redis.Publish(ctx, topic, message).Err()
 }
+
+func (s *PubSubService) NumberOfSubscribers(ctx context.Context, topic string) (int64, error) {
+	res, err := s.redis.PubSubNumSub(ctx, topic).Result()
+	if err != nil {
+		return 0, err
+	}
+	return res[topic], nil
+}

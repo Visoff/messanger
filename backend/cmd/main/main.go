@@ -74,7 +74,7 @@ func main() {
 
 	// controllers
 	user_controller := controllers.NewUserController(user_service, auth_service)
-	chat_controller := controllers.NewChatController(chat_service, pubsub_service, auth_service)
+	chat_controller := controllers.NewChatController(chat_service, user_service, pubsub_service, webpush_service, auth_service)
 	topic_controller := controllers.NewTopicController(topic_service, auth_service)
 	pubsub_controller := controllers.NewPubSubController(pubsub_service, webpush_service, auth_service)
 

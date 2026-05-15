@@ -102,6 +102,42 @@ func (q *Queries) JoinUserToChat(ctx context.Context, arg *JoinUserToChatParams)
 	return err
 }
 
+const listChatMembers = `-- name: ListChatMembers :many
+SELECT users.id, users.username, users.password_hash, users.avatar_url, users.metadata, users.created_at, users.updated_at, users.deleted_at, users.last_seen_at from users
+join chat_members on chat_members.user_id = users.id
+where chat_members.chat_id = $1
+`
+
+func (q *Queries) ListChatMembers(ctx context.Context, chatID uuid.UUID) ([]*User, error) {
+	rows, err := q.db.Query(ctx, listChatMembers, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.PasswordHash,
+			&i.AvatarUrl,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.LastSeenAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listChats = `-- name: ListChats :many
 SELECT chats.id, chats.title, chats.type, chats.avatar_url, chats.metadata, chats.created_at, chats.updated_at, chats.deleted_at from chats
 left join chat_members on chat_members.chat_id = chats.id

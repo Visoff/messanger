@@ -92,3 +92,11 @@ func (s *UserService) GetMe(r *http.Request) (*repository.User, error) {
 	}
 	return user, nil
 }
+
+func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*repository.User, error) {
+	user, err := s.repository.GetUserByUsername(ctx, username)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("User not found")
+	}
+	return user, nil
+}
