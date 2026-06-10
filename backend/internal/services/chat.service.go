@@ -149,7 +149,8 @@ func (s *ChatService) CreateTopic(ctx context.Context, chat_id uuid.UUID, dto *C
 }
 
 type CreateMessageDTO struct {
-	Content string `json:"content" example:"Hello, world!"`
+	Content        string     `json:"content" example:"Hello, world!"`
+	ReplyMessageID *uuid.UUID `json:"reply_message_id"`
 }
 
 func (dto *CreateMessageDTO) Validate() error {
@@ -167,9 +168,10 @@ func (s *ChatService) CreateMessage(ctx context.Context, chat_id uuid.UUID, dto 
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return nil, err}
 	return s.repository.CreateChatMessage(ctx, &repository.CreateChatMessageParams{
-		ChatID: chat_id,
-		SenderID: user_id,
-		Content: &dto.Content,
+		ChatID:         chat_id,
+		SenderID:       user_id,
+		Content:        &dto.Content,
+		ReplyMessageID: dto.ReplyMessageID,
 	})
 }
 

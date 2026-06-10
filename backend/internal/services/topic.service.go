@@ -23,9 +23,10 @@ func (s *TopicService) CreateMessage(ctx context.Context, topic_id uuid.UUID, dt
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return nil, err}
 	return s.repository.CreateTopicMessage(ctx, &repository.CreateTopicMessageParams{
-		TopicID: &topic_id,
-		SenderID: user_id,
-		Content: &dto.Content,
+		TopicID:        &topic_id,
+		SenderID:       user_id,
+		Content:        &dto.Content,
+		ReplyMessageID: dto.ReplyMessageID,
 	})
 }
 

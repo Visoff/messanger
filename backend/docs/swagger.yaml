@@ -108,6 +108,8 @@ definitions:
       content:
         example: Hello, world!
         type: string
+      reply_message_id:
+        type: string
     type: object
   services.CreateTopicDTO:
     properties:

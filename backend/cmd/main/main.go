@@ -49,6 +49,9 @@ func main() {
 	}
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, connectionString)
+	if err != nil {
+		panic(err)
+	}
 
 	if err = pool.Ping(ctx); err != nil {
 		panic(err)

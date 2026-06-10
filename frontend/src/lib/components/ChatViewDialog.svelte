@@ -3,7 +3,7 @@
     import { fetchChat, fetchChatMembers, InviteUserToChat, updateChat, leaveChat, muteChat, createInvitation } from "$lib/api/chats";
     import { fetchTopic, createTopic } from "$lib/api/topics";
     import { resolveUsername } from "$lib/api/users";
-    import type { Chat, Topic, User } from "$lib/types";
+    import type { Chat, Topic, TopicType, User } from "$lib/types";
     import { API_URL } from "$lib/api/env";
     import { user } from "$lib/stores/user";
 
@@ -26,6 +26,7 @@
     let inviteUsername = $state("");
     let showNewTopic = $state(false);
     let newTopicName = $state("");
+    let newTopicType: TopicType | null = $state(null);
     let editingTitle = $state(false);
     let editTitleValue = $state("");
     let invitationLink = $state("");
@@ -48,6 +49,7 @@
         invitationLink = "";
         showInviteInput = false;
         showNewTopic = false;
+        newTopicType = null;
         editingTitle = false;
 
         try {
@@ -104,14 +106,25 @@
     }
 
     async function handleCreateTopic() {
-        if (!newTopicName.trim()) return;
-        const resp = await createTopic(chat_id, newTopicName, "text_topic");
+        if (!newTopicName.trim() || !newTopicType) return;
+        const resp = await createTopic(chat_id, newTopicName, newTopicType);
         if ("error" in resp) {
             error = resp.error ?? "Failed to create topic";
         } else {
             newTopicName = "";
+            newTopicType = null;
             showNewTopic = false;
         }
+    }
+
+    function selectTopicType(type: TopicType) {
+        newTopicType = type;
+    }
+
+    function cancelNewTopic() {
+        newTopicName = "";
+        newTopicType = null;
+        showNewTopic = false;
     }
 
     async function handleInviteUser() {
@@ -262,11 +275,28 @@
             {/if}
 
             {#if showNewTopic}
-                <div class="flex gap-1">
-                    <input class="border rounded px-2 py-1 text-sm flex-1" placeholder="Topic name" bind:value={newTopicName} />
-                    <button type="button" onclick={handleCreateTopic} class="px-2 py-1 bg-green-500 text-white rounded text-xs">Create</button>
-                    <button type="button" onclick={() => showNewTopic = false} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Cancel</button>
-                </div>
+                {#if !newTopicType}
+                    <div class="flex gap-2 justify-center pt-1">
+                        <button type="button" onclick={() => selectTopicType('text_topic')} class="flex items-center gap-1.5 px-4 py-2 bg-blue-100 hover:bg-blue-200 rounded-lg text-sm transition-colors">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                            </svg>
+                            Text Topic
+                        </button>
+                        <button type="button" onclick={() => selectTopicType('voice_topic')} class="flex items-center gap-1.5 px-4 py-2 bg-green-100 hover:bg-green-200 rounded-lg text-sm transition-colors">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                            </svg>
+                            Video Topic
+                        </button>
+                    </div>
+                {:else}
+                    <div class="flex gap-1">
+                        <input class="border rounded px-2 py-1 text-sm flex-1" placeholder="Topic name" bind:value={newTopicName} />
+                        <button type="button" onclick={handleCreateTopic} class="px-2 py-1 bg-green-500 text-white rounded text-xs">Create</button>
+                        <button type="button" onclick={cancelNewTopic} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Cancel</button>
+                    </div>
+                {/if}
             {/if}
 
             <div class="flex flex-wrap justify-center gap-2 pt-2 border-t border-gray-400">

@@ -15,20 +15,27 @@ const createChatMessage = `-- name: CreateChatMessage :one
 INSERT INTO messages (
     chat_id,
     sender_id,
-    content
+    content,
+    reply_message_id
 ) VALUES (
-    $1, $2, $3
+    $1, $2, $3, $4
 ) RETURNING id, chat_id, topic_id, sender_id, reply_message_id, content, created_at, updated_at, deleted_at
 `
 
 type CreateChatMessageParams struct {
-	ChatID   uuid.UUID `json:"chat_id"`
-	SenderID uuid.UUID `json:"sender_id"`
-	Content  *string   `json:"content"`
+	ChatID         uuid.UUID  `json:"chat_id"`
+	SenderID       uuid.UUID  `json:"sender_id"`
+	Content        *string    `json:"content"`
+	ReplyMessageID *uuid.UUID `json:"reply_message_id"`
 }
 
 func (q *Queries) CreateChatMessage(ctx context.Context, arg *CreateChatMessageParams) (*Message, error) {
-	row := q.db.QueryRow(ctx, createChatMessage, arg.ChatID, arg.SenderID, arg.Content)
+	row := q.db.QueryRow(ctx, createChatMessage,
+		arg.ChatID,
+		arg.SenderID,
+		arg.Content,
+		arg.ReplyMessageID,
+	)
 	var i Message
 	err := row.Scan(
 		&i.ID,
@@ -49,20 +56,27 @@ INSERT INTO messages (
     topic_id,
     sender_id,
     content,
+    reply_message_id,
     chat_id
 ) VALUES (
-    $1, $2, $3, (select chat_id from topics where topics.id = $1)
+    $1, $2, $3, $4, (select chat_id from topics where topics.id = $1)
 ) RETURNING id, chat_id, topic_id, sender_id, reply_message_id, content, created_at, updated_at, deleted_at
 `
 
 type CreateTopicMessageParams struct {
-	TopicID  *uuid.UUID `json:"topic_id"`
-	SenderID uuid.UUID  `json:"sender_id"`
-	Content  *string    `json:"content"`
+	TopicID        *uuid.UUID `json:"topic_id"`
+	SenderID       uuid.UUID  `json:"sender_id"`
+	Content        *string    `json:"content"`
+	ReplyMessageID *uuid.UUID `json:"reply_message_id"`
 }
 
 func (q *Queries) CreateTopicMessage(ctx context.Context, arg *CreateTopicMessageParams) (*Message, error) {
-	row := q.db.QueryRow(ctx, createTopicMessage, arg.TopicID, arg.SenderID, arg.Content)
+	row := q.db.QueryRow(ctx, createTopicMessage,
+		arg.TopicID,
+		arg.SenderID,
+		arg.Content,
+		arg.ReplyMessageID,
+	)
 	var i Message
 	err := row.Scan(
 		&i.ID,

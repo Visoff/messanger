@@ -21,8 +21,12 @@ export async function fetchMessages(chat_id: string, topic_id?: string): Promise
     return data;
 }
 
-export async function sendMessage(chat_id: string, topic_id: string | undefined, content: string): Promise<Message | ErrorResponse> {
+export async function sendMessage(chat_id: string, topic_id: string | undefined, content: string, reply_message_id?: string): Promise<Message | ErrorResponse> {
     const token = localStorage.getItem('token');
+    const body: Record<string, unknown> = { content };
+    if (reply_message_id) {
+        body.reply_message_id = reply_message_id;
+    }
     if (topic_id === undefined) {
         const response = await fetch(`${API_URL}/chats/${chat_id}/messages`, {
             method: 'POST',
@@ -30,7 +34,7 @@ export async function sendMessage(chat_id: string, topic_id: string | undefined,
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ content }),
+            body: JSON.stringify(body),
         })
         const data = await response.json();
         return data;
@@ -41,7 +45,7 @@ export async function sendMessage(chat_id: string, topic_id: string | undefined,
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
     })
     const data = await response.json();
     return data;

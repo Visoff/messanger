@@ -21,15 +21,22 @@ services:
       #- 49152-65535:49152-65535/udp
       - 8080:8080
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger?sslmode=disable
+      - REDIS_URL=valkey:6379
+      - VALKEY_URL=valkey:6379
       - PUBLIC_IP=192.168.100.6
+      - VAPID_PUBLIC_KEY=BPTNpgj3cjWFNTiZH22QTdb600avvQAZ3PPhwNWILdT2q5zXdB3nLQ9Rd0QZ_sFU24gdxUEKNpbovVXbab2O0gY
+      - VAPID_PRIVATE_KEY=TLI6GRxBORMCeVnjvGzzvqQuaMkty0r52bDRiImTJns
     depends_on:
       - postgres
+      - valkey
 
   webrtc:
     build:
-      context: webrtc
-    #networks:
-      #- host # dynamic port allocation is needed for TURN server and p2p webrtc
+      context: webrtc_service
+    ports:
+      - 8081:8081
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger?sslmode=disable
+      - PUBLIC_IP=192.168.100.6
+      - PORT=8081

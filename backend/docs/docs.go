@@ -1054,6 +1054,9 @@ const docTemplate = `{
                 "content": {
                     "type": "string",
                     "example": "Hello, world!"
+                },
+                "reply_message_id": {
+                    "type": "string"
                 }
             }
         },

@@ -17,6 +17,7 @@
     let inputValue: string = $state("");
     let messagesContainer: HTMLDivElement;
     let userCache: Record<string, string> = $state({});
+    let replyToMessage: Message | null = $state(null);
 
     $effect(() => {
         (async () => {
@@ -53,6 +54,11 @@
     function getSenderName(sender_id: string): string {
         if (sender_id === $user?.id) return "You";
         return userCache[sender_id] || sender_id.slice(0, 8);
+    }
+
+    function getRepliedMessage(message: Message): Message | undefined {
+        if (!message.reply_message_id) return undefined;
+        return messages.find(m => m.id === message.reply_message_id);
     }
 
     function notify(title: string, body?: string) {
@@ -93,16 +99,32 @@
         }, 10);
     }
 
+    function scrollToMessage(messageId: string) {
+        const el = document.getElementById(`msg-${messageId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }
+
+    function startReply(message: Message) {
+        replyToMessage = message;
+    }
+
+    function cancelReply() {
+        replyToMessage = null;
+    }
+
     async function sendMessageEvent(e: SubmitEvent) {
         e.preventDefault();
         if (!inputValue.trim()) return;
         
-        const resp = await sendMessage(chat_id, topic_id, inputValue);
+        const resp = await sendMessage(chat_id, topic_id, inputValue, replyToMessage?.id);
         if ("error" in resp) {
             console.error(resp.error);
             return
         };
         inputValue = "";
+        replyToMessage = null;
         addOptimisticMessage(resp);
     }
 
@@ -118,11 +140,22 @@
     <div class="messages-wrapper" bind:this={messagesContainer}>
         {#each messages as message (message.id)}
             <div class="message-row" class:sent={message.sender_id === $user?.id}>
-                <div class="message-bubble" class:received={message.sender_id !== $user?.id}>
+                <div class="message-bubble" class:received={message.sender_id !== $user?.id} id="msg-{message.id}">
+                    {#if message.reply_message_id}
+                        {@const replied = getRepliedMessage(message)}
+                        {#if replied}
+                            <button type="button" class="reply-header" onclick={(e) => { e.stopPropagation(); scrollToMessage(replied.id); }}>
+                                <div class="reply-header-sender">{getSenderName(replied.sender_id)}</div>
+                                <div class="reply-header-text">{replied.content || "No content"}</div>
+                            </button>
+                        {/if}
+                    {/if}
                     {#if message.sender_id !== $user?.id}
                         <div class="message-sender">{getSenderName(message.sender_id)}</div>
                     {/if}
-                    <div class="message-content">{message.content}</div>
+                    <button type="button" class="message-content-btn" onclick={() => startReply(message)}>
+                        <div class="message-content">{message.content}</div>
+                    </button>
                     <div class="message-meta">
                     {#if topic_id == undefined && message.topic_id != undefined}
                         <span class="text-xs text-blue-500">{chat_topics.find(t => t.id === message.topic_id)?.title}</span>
@@ -140,6 +173,20 @@
             </div>
         {/if}
     </div>
+    {#if replyToMessage}
+        <div class="reply-indicator">
+            <div class="reply-indicator-bar"></div>
+            <div class="reply-indicator-content">
+                <span class="reply-indicator-sender">{getSenderName(replyToMessage.sender_id)}</span>
+                <span class="reply-indicator-text">{replyToMessage.content || "No content"}</span>
+            </div>
+            <button type="button" class="reply-indicator-close" aria-label="Cancel reply" onclick={cancelReply}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+            </button>
+        </div>
+    {/if}
     <form class="message-input-wrapper" onsubmit={sendMessageEvent}>
         <input 
             class="message-input" 
@@ -174,16 +221,19 @@
 
     .message-row {
         display: flex;
-        justify-content: flex-start;
+        flex-direction: column;
+        align-items: flex-start;
         padding: 0 60px 0 0;
     }
 
     .message-row.sent {
-        justify-content: flex-end;
+        align-items: flex-end;
         padding: 0 0 0 60px;
     }
 
     .message-bubble {
+        display: flex;
+        flex-direction: column;
         max-width: 70%;
         padding: 10px 14px;
         border-radius: 18px;
@@ -196,10 +246,23 @@
         border: 1px solid #e6e8eb;
     }
 
+    .message-bubble:hover {
+        filter: brightness(0.97);
+    }
+
     .message-content {
         font-size: 15px;
         line-height: 1.4;
         word-wrap: break-word;
+    }
+
+    .message-content-btn {
+        display: block;
+        text-align: inherit;
+        border: none;
+        background: none;
+        padding: 0;
+        cursor: pointer;
     }
 
     .message-sender {
@@ -220,6 +283,45 @@
         color: #8e8e93;
     }
 
+    .reply-header {
+        display: flex;
+        flex-direction: column;
+        margin: -10px -14px 6px -14px;
+        padding: 8px 14px;
+        border: none;
+        background: #c8e6f8;
+        border-radius: 18px 18px 0 0;
+        border-bottom: 1px solid #b0d4e8;
+        cursor: pointer;
+        text-align: left;
+        border-top-left-radius: 4px;
+    }
+
+    .message-bubble.received .reply-header {
+        background: #e2e4e7;
+        border-bottom: 1px solid #d0d2d5;
+        margin: -11px -15px 6px -15px;
+        border-top-left-radius: 4px;
+    }
+
+    .reply-header:hover {
+        filter: brightness(0.95);
+    }
+
+    .reply-header-sender {
+        font-size: 11px;
+        font-weight: 600;
+        color: #43a047;
+    }
+
+    .reply-header-text {
+        font-size: 12px;
+        color: #555;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .empty-messages {
         flex: 1;
         display: flex;
@@ -232,6 +334,61 @@
     .empty-hint {
         font-size: 13px;
         margin-top: 4px;
+    }
+
+    .reply-indicator {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px 0 16px;
+        background: #fff;
+    }
+
+    .reply-indicator-bar {
+        width: 3px;
+        height: 36px;
+        background: #43a047;
+        border-radius: 2px;
+        flex-shrink: 0;
+    }
+
+    .reply-indicator-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .reply-indicator-sender {
+        font-size: 12px;
+        font-weight: 600;
+        color: #43a047;
+    }
+
+    .reply-indicator-text {
+        font-size: 13px;
+        color: #8e8e93;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .reply-indicator-close {
+        border: none;
+        background: transparent;
+        padding: 4px;
+        cursor: pointer;
+        color: #8e8e93;
+        flex-shrink: 0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .reply-indicator-close:hover {
+        background: #e8eaed;
+        color: #000;
     }
 
     .message-input-wrapper {
