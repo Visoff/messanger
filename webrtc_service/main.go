@@ -33,6 +33,7 @@ func main() {
 
 	controller := NewWebRTCController(&ws_updater, service)
 	http.Handle("/", controller)
+	log.Println("Listening on port " + port)
 	err = http.ListenAndServe(":" + port, nil)
 	if err != nil {
 		log.Println(err)

@@ -51,12 +51,15 @@ func NewWebRTCController(ws_updater *websocket.Upgrader, webrtc_service *WebRTCS
 
 	mux.Handle("/room/{id}", http.HandlerFunc(c.HandleRoom))
 
-	public_id := net.ParseIP(os.Getenv("PUBLIC_IP"))
+	public_id, err := net.LookupIP(os.Getenv("PUBLIC_IP"))
+	if err != nil {
+		panic(err)
+	}
 	if public_id == nil {
 		panic("PUBLIC_IP is not set")
 	}
 
-	_, err := turn.NewServer(turn.ServerConfig{
+	_, err = turn.NewServer(turn.ServerConfig{
 		Realm:              "dev.uni.visoff.ru",
 		AllocationLifetime: 5 * time.Minute,
 		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
@@ -67,7 +70,7 @@ func NewWebRTCController(ws_updater *websocket.Upgrader, webrtc_service *WebRTCS
 				PacketConn: webrtc_service.MustCreateUDPListener("0.0.0.0:3478"),
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					Address:      "0.0.0.0",
-					RelayAddress: public_id,
+					RelayAddress: public_id[0],
 				},
 			},
 		},
@@ -138,6 +141,33 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	peer := &Peer{conn: conn, pc: pc}
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		ticker := time.NewTicker(25 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				peer.mu.Lock()
+				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				err := conn.WriteMessage(websocket.PingMessage, nil)
+				peer.mu.Unlock()
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
 
 	peer_id := uuid.New().String()
 	room.peersMU.Lock()
@@ -161,6 +191,7 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 		v.localTracks[k] = localTrack
 		v.localTracksMU.Unlock()
 	}
+	peer.ScheduleRenegotiation()
 
 	defer func() {
 		room.peersMU.Lock()
@@ -208,11 +239,7 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 			forwarder.localTracks[k] = localTrack
 			forwarder.localTracksMU.Unlock()
 
-			err = v.Renegotiate()
-			if err != nil {
-				log.Println(err)
-				continue
-			}
+			v.ScheduleRenegotiation()
 		}
 
 		go func() {

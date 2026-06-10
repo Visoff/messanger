@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/pion/interceptor"
@@ -58,6 +59,7 @@ type Peer struct {
 	pc   *webrtc.PeerConnection
 
 	pendingCandidates []webrtc.ICECandidate
+	renegotiateTimer  *time.Timer
 }
 
 func (p *Peer) Renegotiate() error {
@@ -85,4 +87,17 @@ func (p *Peer) Renegotiate() error {
 	}
 
 	return nil
+}
+
+func (p *Peer) ScheduleRenegotiation() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.renegotiateTimer != nil {
+		p.renegotiateTimer.Stop()
+	}
+	p.renegotiateTimer = time.AfterFunc(150*time.Millisecond, func() {
+		if err := p.Renegotiate(); err != nil {
+			log.Println("ScheduleRenegotiation error:", err)
+		}
+	})
 }
