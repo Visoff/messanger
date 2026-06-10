@@ -32,18 +32,13 @@ func (q *Queries) CreateChatInvitation(ctx context.Context, arg *CreateChatInvit
 	return id, err
 }
 
-const getInvitationByUserAndChat = `-- name: GetInvitationByUserAndChat :one
+const getInvitationById = `-- name: GetInvitationById :one
 SELECT id, user_id, chat_id, created_at, updated_at, deleted_at FROM invitation
-WHERE user_id = $1 AND chat_id = $2 AND deleted_at IS NULL
+WHERE id = $1 AND deleted_at IS NULL
 `
 
-type GetInvitationByUserAndChatParams struct {
-	UserID uuid.UUID `json:"user_id"`
-	ChatID uuid.UUID `json:"chat_id"`
-}
-
-func (q *Queries) GetInvitationByUserAndChat(ctx context.Context, arg *GetInvitationByUserAndChatParams) (*Invitation, error) {
-	row := q.db.QueryRow(ctx, getInvitationByUserAndChat, arg.UserID, arg.ChatID)
+func (q *Queries) GetInvitationById(ctx context.Context, id uuid.UUID) (*Invitation, error) {
+	row := q.db.QueryRow(ctx, getInvitationById, id)
 	var i Invitation
 	err := row.Scan(
 		&i.ID,
@@ -56,13 +51,18 @@ func (q *Queries) GetInvitationByUserAndChat(ctx context.Context, arg *GetInvita
 	return &i, err
 }
 
-const getInvitationById = `-- name: GetInvitationById :one
+const getInvitationByUserAndChat = `-- name: GetInvitationByUserAndChat :one
 SELECT id, user_id, chat_id, created_at, updated_at, deleted_at FROM invitation
-WHERE id = $1 AND deleted_at IS NULL
+WHERE user_id = $1 AND chat_id = $2 AND deleted_at IS NULL
 `
 
-func (q *Queries) GetInvitationById(ctx context.Context, id uuid.UUID) (*Invitation, error) {
-	row := q.db.QueryRow(ctx, getInvitationById, id)
+type GetInvitationByUserAndChatParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	ChatID uuid.UUID `json:"chat_id"`
+}
+
+func (q *Queries) GetInvitationByUserAndChat(ctx context.Context, arg *GetInvitationByUserAndChatParams) (*Invitation, error) {
+	row := q.db.QueryRow(ctx, getInvitationByUserAndChat, arg.UserID, arg.ChatID)
 	var i Invitation
 	err := row.Scan(
 		&i.ID,

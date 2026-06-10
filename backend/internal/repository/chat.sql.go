@@ -32,6 +32,28 @@ func (q *Queries) AddUserToChat(ctx context.Context, arg *AddUserToChatParams) e
 	return err
 }
 
+const checkPrivateChatExists = `-- name: CheckPrivateChatExists :one
+SELECT chats.id FROM chats
+JOIN chat_members cm1 ON cm1.chat_id = chats.id
+JOIN chat_members cm2 ON cm2.chat_id = chats.id
+WHERE chats.type = 'private'
+  AND cm1.user_id = $1
+  AND cm2.user_id = $2
+LIMIT 1
+`
+
+type CheckPrivateChatExistsParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	UserID_2 uuid.UUID `json:"user_id_2"`
+}
+
+func (q *Queries) CheckPrivateChatExists(ctx context.Context, arg *CheckPrivateChatExistsParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, checkPrivateChatExists, arg.UserID, arg.UserID_2)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createChat = `-- name: CreateChat :one
 INSERT INTO chats (
     title,
@@ -138,96 +160,6 @@ func (q *Queries) ListChatMembers(ctx context.Context, chatID uuid.UUID) ([]*Use
 	return items, nil
 }
 
-const updateChat = `-- name: UpdateChat :one
-UPDATE chats SET
-    title = $2,
-    metadata = $3,
-    updated_at = NOW()
-WHERE id = $1 RETURNING id, title, type, avatar_url, metadata, created_at, updated_at, deleted_at
-`
-
-type UpdateChatParams struct {
-	ID       uuid.UUID `json:"id"`
-	Title    string    `json:"title"`
-	Metadata []byte    `json:"metadata"`
-}
-
-func (q *Queries) UpdateChat(ctx context.Context, arg *UpdateChatParams) (*Chat, error) {
-	row := q.db.QueryRow(ctx, updateChat, arg.ID, arg.Title, arg.Metadata)
-	var i Chat
-	err := row.Scan(
-		&i.ID,
-		&i.Title,
-		&i.Type,
-		&i.AvatarUrl,
-		&i.Metadata,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-	)
-	return &i, err
-}
-
-const removeUserFromChat = `-- name: RemoveUserFromChat :exec
-DELETE FROM chat_members
-WHERE user_id = $1 AND chat_id = $2
-`
-
-type RemoveUserFromChatParams struct {
-	UserID uuid.UUID `json:"user_id"`
-	ChatID uuid.UUID `json:"chat_id"`
-}
-
-func (q *Queries) RemoveUserFromChat(ctx context.Context, arg *RemoveUserFromChatParams) error {
-	_, err := q.db.Exec(ctx, removeUserFromChat, arg.UserID, arg.ChatID)
-	return err
-}
-
-const checkPrivateChatExists = `-- name: CheckPrivateChatExists :one
-SELECT chats.id FROM chats
-JOIN chat_members cm1 ON cm1.chat_id = chats.id
-JOIN chat_members cm2 ON cm2.chat_id = chats.id
-WHERE chats.type = 'private'
-  AND cm1.user_id = $1
-  AND cm2.user_id = $2
-LIMIT 1
-`
-
-func (q *Queries) CheckPrivateChatExists(ctx context.Context, user1ID uuid.UUID, user2ID uuid.UUID) (*uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, checkPrivateChatExists, user1ID, user2ID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return &id, err
-}
-
-const updateChatMuted = `-- name: UpdateChatMuted :one
-UPDATE chats SET
-    metadata = $2,
-    updated_at = NOW()
-WHERE id = $1 RETURNING id, title, type, avatar_url, metadata, created_at, updated_at, deleted_at
-`
-
-type UpdateChatMutedParams struct {
-	ID       uuid.UUID `json:"id"`
-	Metadata []byte    `json:"metadata"`
-}
-
-func (q *Queries) UpdateChatMuted(ctx context.Context, arg *UpdateChatMutedParams) (*Chat, error) {
-	row := q.db.QueryRow(ctx, updateChatMuted, arg.ID, arg.Metadata)
-	var i Chat
-	err := row.Scan(
-		&i.ID,
-		&i.Title,
-		&i.Type,
-		&i.AvatarUrl,
-		&i.Metadata,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-	)
-	return &i, err
-}
-
 const listChats = `-- name: ListChats :many
 SELECT chats.id, chats.title, chats.type, chats.avatar_url, chats.metadata, chats.created_at, chats.updated_at, chats.deleted_at from chats
 left join chat_members on chat_members.chat_id = chats.id
@@ -261,4 +193,77 @@ func (q *Queries) ListChats(ctx context.Context, userID uuid.UUID) ([]*Chat, err
 		return nil, err
 	}
 	return items, nil
+}
+
+const removeUserFromChat = `-- name: RemoveUserFromChat :exec
+DELETE FROM chat_members
+WHERE user_id = $1 AND chat_id = $2
+`
+
+type RemoveUserFromChatParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	ChatID uuid.UUID `json:"chat_id"`
+}
+
+func (q *Queries) RemoveUserFromChat(ctx context.Context, arg *RemoveUserFromChatParams) error {
+	_, err := q.db.Exec(ctx, removeUserFromChat, arg.UserID, arg.ChatID)
+	return err
+}
+
+const updateChat = `-- name: UpdateChat :one
+UPDATE chats SET
+    title = $2,
+    metadata = $3,
+    updated_at = NOW()
+WHERE id = $1 RETURNING id, title, type, avatar_url, metadata, created_at, updated_at, deleted_at
+`
+
+type UpdateChatParams struct {
+	ID       uuid.UUID `json:"id"`
+	Title    string    `json:"title"`
+	Metadata []byte    `json:"metadata"`
+}
+
+func (q *Queries) UpdateChat(ctx context.Context, arg *UpdateChatParams) (*Chat, error) {
+	row := q.db.QueryRow(ctx, updateChat, arg.ID, arg.Title, arg.Metadata)
+	var i Chat
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Type,
+		&i.AvatarUrl,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return &i, err
+}
+
+const updateChatMuted = `-- name: UpdateChatMuted :one
+UPDATE chats SET
+    metadata = $2,
+    updated_at = NOW()
+WHERE id = $1 RETURNING id, title, type, avatar_url, metadata, created_at, updated_at, deleted_at
+`
+
+type UpdateChatMutedParams struct {
+	ID       uuid.UUID `json:"id"`
+	Metadata []byte    `json:"metadata"`
+}
+
+func (q *Queries) UpdateChatMuted(ctx context.Context, arg *UpdateChatMutedParams) (*Chat, error) {
+	row := q.db.QueryRow(ctx, updateChatMuted, arg.ID, arg.Metadata)
+	var i Chat
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Type,
+		&i.AvatarUrl,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return &i, err
 }

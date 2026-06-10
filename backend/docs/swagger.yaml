@@ -156,6 +156,8 @@ definitions:
       username:
         type: string
     type: object
+  services.UpdateUserDTO:
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -597,6 +599,37 @@ paths:
           schema:
             $ref: '#/definitions/httperrors.ErrorResponse'
       summary: Get current user
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      description: Update the current user's profile.
+      parameters:
+      - description: User details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.UpdateUserDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.DisplayUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update current user
       tags:
       - users
   /users/register:

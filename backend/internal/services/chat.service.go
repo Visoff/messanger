@@ -231,9 +231,9 @@ func (s *ChatService) ListChatMembers(ctx context.Context, chat_id uuid.UUID) ([
 }
 
 func (s *ChatService) CreatePrivateChat(ctx context.Context, user1_id, user2_id uuid.UUID) (*repository.Chat, error) {
-	existing, err := s.repository.CheckPrivateChatExists(ctx, user1_id, user2_id)
-	if err == nil && existing != nil {
-		chat, err := s.repository.GetChat(ctx, *existing)
+	existing, err := s.repository.CheckPrivateChatExists(ctx, &repository.CheckPrivateChatExistsParams{UserID: user1_id, UserID_2: user2_id })
+	if err == nil && existing != uuid.Nil {
+		chat, err := s.repository.GetChat(ctx, existing)
 		if err == nil {
 			return chat, httperrors.NewHTTPConflictError("Private chat already exists")
 		}

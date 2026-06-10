@@ -63,6 +63,27 @@ func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (*User, error) 
 	return &i, err
 }
 
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, password_hash, avatar_url, metadata, created_at, updated_at, deleted_at, last_seen_at FROM users WHERE username = $1
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (*User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PasswordHash,
+		&i.AvatarUrl,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.LastSeenAt,
+	)
+	return &i, err
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users SET
     username = $2,
@@ -80,28 +101,12 @@ type UpdateUserParams struct {
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User, error) {
-	row := q.db.QueryRow(ctx, updateUser, arg.ID, arg.Username, arg.AvatarUrl, arg.Metadata)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Username,
-		&i.PasswordHash,
-		&i.AvatarUrl,
-		&i.Metadata,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.LastSeenAt,
+	row := q.db.QueryRow(ctx, updateUser,
+		arg.ID,
+		arg.Username,
+		arg.AvatarUrl,
+		arg.Metadata,
 	)
-	return &i, err
-}
-
-const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, password_hash, avatar_url, metadata, created_at, updated_at, deleted_at, last_seen_at FROM users WHERE username = $1
-`
-
-func (q *Queries) GetUserByUsername(ctx context.Context, username string) (*User, error) {
-	row := q.db.QueryRow(ctx, getUserByUsername, username)
 	var i User
 	err := row.Scan(
 		&i.ID,
