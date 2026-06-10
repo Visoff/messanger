@@ -1,4 +1,5 @@
 export const API_URL = import.meta.env.VITE_API_URL
+export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_SERVER
 // protocol = BASE_URL = API_URL
 const IS_SECURE = API_URL.startsWith('https://');
 const BASE_URL = API_URL.substring(7 + IS_SECURE);

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { API_URL, API_URL_WITH_PROTOCOL } from "$lib/api/env";
+    import { API_URL, WEBSOCKET_URL } from "$lib/api/env";
     import { onMount } from "svelte";
 
     let stream: MediaStream | undefined = $state(undefined);
@@ -19,7 +19,7 @@
         }
         console.log("room_id", room_id);
         const ws = new WebSocket(
-            `${API_URL_WITH_PROTOCOL("ws://", "wss://")}/conference/room/${room_id}`,
+            `${WEBSOCKET_URL}/room/${room_id}`,
         );
         await new Promise((resolve, reject) => {
             ws.onopen = resolve;

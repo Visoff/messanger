@@ -51,12 +51,15 @@ func NewWebRTCController(ws_updater *websocket.Upgrader, webrtc_service *WebRTCS
 
 	mux.Handle("/room/{id}", http.HandlerFunc(c.HandleRoom))
 
-	public_id := net.ParseIP(os.Getenv("PUBLIC_IP"))
+	public_id, err := net.LookupIP(os.Getenv("PUBLIC_IP"))
+	if err != nil {
+		panic(err)
+	}
 	if public_id == nil {
 		panic("PUBLIC_IP is not set")
 	}
 
-	_, err := turn.NewServer(turn.ServerConfig{
+	_, err = turn.NewServer(turn.ServerConfig{
 		Realm:              "dev.uni.visoff.ru",
 		AllocationLifetime: 5 * time.Minute,
 		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
@@ -67,7 +70,7 @@ func NewWebRTCController(ws_updater *websocket.Upgrader, webrtc_service *WebRTCS
 				PacketConn: webrtc_service.MustCreateUDPListener("0.0.0.0:3478"),
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					Address:      "0.0.0.0",
-					RelayAddress: public_id,
+					RelayAddress: public_id[0],
 				},
 			},
 		},
