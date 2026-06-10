@@ -1,12 +1,14 @@
 <script lang="ts">
     import Dialog from "./Dialog.svelte";
     import { user } from "$lib/stores/user";
-    import { updateUser } from "$lib/api/auth";
+    import { updateUser, uploadAvatar } from "$lib/api/auth";
 
     let dialog: Dialog;
     let editingField: string | null = $state(null);
     let editValue: string = $state("");
     let errorMsg: string = $state("");
+    let uploadingAvatar = $state(false);
+    let fileInput: HTMLInputElement;
 
     export function open() { dialog.open(); }
 
@@ -32,6 +34,23 @@
 
     function cancelEdit() { editingField = null; errorMsg = ""; }
 
+    async function handleAvatarUpload(e: Event) {
+        const target = e.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (!file || !$user) return;
+
+        uploadingAvatar = true;
+        errorMsg = "";
+        const resp = await uploadAvatar(file);
+        if ("error" in resp) {
+            errorMsg = resp.error;
+        } else {
+            user.set(resp);
+        }
+        uploadingAvatar = false;
+        target.value = "";
+    }
+
     function logout() {
         localStorage.removeItem("token");
         user.set(undefined);
@@ -54,9 +73,20 @@
 
         {#if $user}
             <div class="flex flex-col items-center gap-2 py-2">
-                <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-xl">
-                    {getInitials($user.username)}
-                </div>
+                <button onclick={() => fileInput.click()} class="relative w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-xl overflow-hidden hover:opacity-80 transition-opacity group" title="Change avatar">
+                    {#if $user.avatar_url}
+                        <img src={$user.avatar_url} alt="avatar" class="w-full h-full object-cover" />
+                    {:else}
+                        {getInitials($user.username)}
+                    {/if}
+                    <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" opacity="0"/><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM17 5h-1.5l-1-1h-5l-1 1H7v2h10V5zM7 7v10a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7z"/></svg>
+                    </div>
+                </button>
+                {#if uploadingAvatar}
+                    <span class="text-xs text-gray-500">Uploading...</span>
+                {/if}
+                <input bind:this={fileInput} type="file" accept="image/*" class="hidden" onchange={handleAvatarUpload} />
             </div>
 
             <div class="text-sm space-y-2">

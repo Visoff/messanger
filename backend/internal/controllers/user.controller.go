@@ -1,27 +1,36 @@
 package controllers
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/Visoff/messanger/internal/services"
 	"github.com/Visoff/messanger/pkgs/dtos"
 	"github.com/Visoff/messanger/pkgs/handlers"
+	"github.com/Visoff/messanger/pkgs/httperrors"
 )
 
 type UserController struct {
-	userService *services.UserService
-	mux         *http.ServeMux
+	userService         *services.UserService
+	mux                 *http.ServeMux
+	fileStorageUrl      string
+	publicFileStorageUrl string
 }
 
 func (c *UserController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.mux.ServeHTTP(w, r)
 }
 
-func NewUserController(userService *services.UserService, authService *services.AuthService) *UserController {
+func NewUserController(userService *services.UserService, authService *services.AuthService, fileStorageUrl string, publicFileStorageUrl string) *UserController {
 	c := &UserController{
-		userService: userService,
-		mux:         nil,
+		userService:          userService,
+		mux:                  nil,
+		fileStorageUrl:       fileStorageUrl,
+		publicFileStorageUrl: publicFileStorageUrl,
 	}
 
 	mux := http.NewServeMux()
@@ -32,6 +41,7 @@ func NewUserController(userService *services.UserService, authService *services.
 
 	mux.Handle("GET /me", authService.ProtectRoute(handlers.Handler(c.GetMe)))
 	mux.Handle("PUT /me", authService.ProtectRoute(handlers.Handler(c.UpdateMe)))
+	mux.Handle("POST /me/avatar", authService.ProtectRoute(handlers.Handler(c.UploadMyAvatar)))
 
 	mux.Handle("GET /id/{id}", handlers.Handler(c.GetUserByID))
 	mux.Handle("GET /username/{username}", handlers.Handler(c.GetUserByUsername))
@@ -173,6 +183,67 @@ func (c *UserController) GetUserByUsername(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(c.userService.NewDisplayUser(user))
 	return nil
+}
+
+func (c *UserController) UploadMyAvatar(w http.ResponseWriter, r *http.Request) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		return httperrors.NewHTTPBadRequestError("File too large or invalid form")
+	}
+
+	file, header, err := r.FormFile("avatar")
+	if err != nil {
+		return httperrors.NewHTTPBadRequestError("No file provided")
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		return httperrors.NewHTTPBadRequestError("Only image files are allowed")
+	}
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	uuid, err := c.uploadToFileStorage(fileBytes)
+	if err != nil {
+		return err
+	}
+
+	avatarUrl := c.publicFileStorageUrl + "/" + uuid
+
+	user, err := c.userService.UpdateMyAvatar(r.Context(), avatarUrl)
+	if err != nil {
+		return err
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
+	return nil
+}
+
+func (c *UserController) uploadToFileStorage(data []byte) (string, error) {
+	resp, err := http.Post(c.fileStorageUrl+"/file", "application/octet-stream", bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("file_storage error: %s", string(body))
+	}
+
+	var result struct {
+		UUID string `json:"uuid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	return result.UUID, nil
 }
 
 // GetUserByID gets a user by ID.

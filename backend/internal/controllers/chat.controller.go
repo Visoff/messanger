@@ -1,9 +1,13 @@
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/Visoff/messanger/internal/services"
 	"github.com/Visoff/messanger/pkgs/dtos"
@@ -13,20 +17,24 @@ import (
 )
 
 type ChatController struct {
-	chatService    *services.ChatService
-	userService    *services.UserService
-	pubsubService  *services.PubSubService
-	webpushService *services.WebPushService
-	mux            *http.ServeMux
+	chatService          *services.ChatService
+	userService          *services.UserService
+	pubsubService        *services.PubSubService
+	webpushService       *services.WebPushService
+	mux                  *http.ServeMux
+	fileStorageUrl       string
+	publicFileStorageUrl string
 }
 
-func NewChatController(chatService *services.ChatService, userService *services.UserService, pubsubService *services.PubSubService, webpushService *services.WebPushService, authService *services.AuthService) *ChatController {
+func NewChatController(chatService *services.ChatService, userService *services.UserService, pubsubService *services.PubSubService, webpushService *services.WebPushService, authService *services.AuthService, fileStorageUrl string, publicFileStorageUrl string) *ChatController {
 	c := &ChatController{
-		chatService:    chatService,
-		pubsubService:  pubsubService,
-		userService:    userService,
-		webpushService: webpushService,
-		mux:            nil,
+		chatService:          chatService,
+		pubsubService:        pubsubService,
+		userService:          userService,
+		webpushService:       webpushService,
+		mux:                  nil,
+		fileStorageUrl:       fileStorageUrl,
+		publicFileStorageUrl: publicFileStorageUrl,
 	}
 
 	mux := http.NewServeMux()
@@ -52,6 +60,7 @@ func NewChatController(chatService *services.ChatService, userService *services.
 	mux.Handle("POST /{id}/invite/{user_id}", authService.ProtectRoute(handlers.Handler(c.InviteUser)))
 	mux.Handle("POST /{id}/invitation", authService.ProtectRoute(handlers.Handler(c.CreateInvitation)))
 	mux.Handle("PUT /{id}", authService.ProtectRoute(handlers.Handler(c.UpdateChat)))
+	mux.Handle("POST /{id}/avatar", authService.ProtectRoute(handlers.Handler(c.UploadChatAvatar)))
 	mux.Handle("POST /{id}/leave", authService.ProtectRoute(handlers.Handler(c.LeaveChat)))
 	mux.Handle("PUT /{id}/mute", authService.ProtectRoute(handlers.Handler(c.MuteChat)))
 	mux.Handle("GET /{id}/members", authService.ProtectRoute(handlers.Handler(c.ListChatMembers)))
@@ -392,6 +401,72 @@ func (c *ChatController) MuteChat(w http.ResponseWriter, r *http.Request) error 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(chat)
 	return nil
+}
+
+func (c *ChatController) UploadChatAvatar(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		return httperrors.NewHTTPBadRequestError("File too large or invalid form")
+	}
+
+	file, header, err := r.FormFile("avatar")
+	if err != nil {
+		return httperrors.NewHTTPBadRequestError("No file provided")
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		return httperrors.NewHTTPBadRequestError("Only image files are allowed")
+	}
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	uuid, err := c.uploadToFileStorage(fileBytes)
+	if err != nil {
+		return err
+	}
+
+	avatarUrl := c.publicFileStorageUrl + "/" + uuid
+
+	chat, err := c.chatService.UpdateChatAvatar(r.Context(), chat_id, avatarUrl)
+	if err != nil {
+		return err
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(chat)
+	return nil
+}
+
+func (c *ChatController) uploadToFileStorage(data []byte) (string, error) {
+	resp, err := http.Post(c.fileStorageUrl+"/file", "application/octet-stream", bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("file_storage error: %s", string(body))
+	}
+
+	var result struct {
+		UUID string `json:"uuid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	return result.UUID, nil
 }
 
 func (c *ChatController) ListChatMembers(w http.ResponseWriter, r *http.Request) error {

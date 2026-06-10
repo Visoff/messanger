@@ -4,9 +4,9 @@
     import { resolveUsername } from "$lib/api/users";
     import type { User } from "$lib/types";
 
-    let dialog: Dialog;
+    let dialog: Dialog | undefined = $state();
     let userPopup: Dialog;
-    let dialog_mode: "group" | "private" | "channel" = "group";
+    let dialog_mode: "group" | "private" | "channel" = $state("group");
     let foundUser: User | null = $state(null);
     let searchError: string = $state("");
     let creating = $state(false);
@@ -44,7 +44,7 @@
             return;
         }
         userPopup.close();
-        dialog.close();
+        dialog?.close();
         location.reload();
     }
 
@@ -61,7 +61,7 @@
 </script>
 
 <div>
-    <button class="add-chat-btn" onclick={dialog.open} title="New Chat">
+    <button class="add-chat-btn" onclick={dialog?.open} title="New Chat">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
         </svg>

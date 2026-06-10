@@ -25,30 +25,20 @@ type ChatWithLastMessage struct {
 func (s *ChatService) ListChats(ctx context.Context) ([]*ChatWithLastMessage, error) {
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return []*ChatWithLastMessage{}, err}
-	rows, err := s.repository.ListChatsWithLastMessage(ctx, user_id)
+	chats, err := s.repository.ListUserChats(ctx, user_id)
 	if err != nil {
 		return []*ChatWithLastMessage{}, nil
 	}
 
-	result := make([]*ChatWithLastMessage, 0, len(rows))
-	for _, row := range rows {
-		chat := &repository.Chat{
-			ID:        row.ID,
-			Title:     row.Title,
-			Type:      row.Type,
-			AvatarUrl: row.AvatarUrl,
-			Metadata:  row.Metadata,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
-			DeletedAt: row.DeletedAt,
-		}
-
+	result := make([]*ChatWithLastMessage, 0, len(chats))
+	for _, chat := range chats {
 		if chat.Type == repository.ChatTypePrivate && chat.Title == "" {
 			members, err := s.repository.ListChatMembers(ctx, chat.ID)
 			if err == nil {
 				for _, member := range members {
 					if member.ID != user_id {
 						chat.Title = member.Username
+						chat.AvatarUrl = member.AvatarUrl
 						break
 					}
 				}
@@ -56,18 +46,9 @@ func (s *ChatService) ListChats(ctx context.Context) ([]*ChatWithLastMessage, er
 		}
 
 		item := &ChatWithLastMessage{Chat: chat}
-		if row.MsgID != nil {
-			item.LastMessage = &repository.Message{
-				ID:             *row.MsgID,
-				ChatID:         *row.MsgChatID,
-				TopicID:        row.MsgTopicID,
-				SenderID:       *row.MsgSenderID,
-				ReplyMessageID: row.MsgReplyMessageID,
-				Content:        row.MsgContent,
-				CreatedAt:      *row.MsgCreatedAt,
-				UpdatedAt:      *row.MsgUpdatedAt,
-				DeletedAt:      row.MsgDeletedAt,
-			}
+		msg, err := s.repository.GetChatLastMessage(ctx, chat.ID)
+		if err == nil && msg != nil {
+			item.LastMessage = msg
 		}
 
 		result = append(result, item)
@@ -144,6 +125,7 @@ func (s *ChatService) GetChat(ctx context.Context, chat_id uuid.UUID) (*reposito
 			for _, member := range members {
 				if member.ID != user_id {
 					chat.Title = member.Username
+					chat.AvatarUrl = member.AvatarUrl
 					break
 				}
 			}
@@ -323,6 +305,31 @@ func (s *ChatService) UpdateChat(ctx context.Context, chat_id uuid.UUID, dto *Up
 		ID:       chat_id,
 		Title:    dto.Title,
 		Metadata: metadata,
+	})
+}
+
+func (s *ChatService) UpdateChatAvatar(ctx context.Context, chat_id uuid.UUID, avatarUrl string) (*repository.Chat, error) {
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {
+		return nil, err
+	}
+	members, err := s.repository.ListChatMembers(ctx, chat_id)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("Chat not found")
+	}
+	isMember := false
+	for _, m := range members {
+		if m.ID == user_id {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		return nil, httperrors.NewHTTPForbiddenError("You are not a member of this chat")
+	}
+	return s.repository.UpdateChatAvatar(ctx, &repository.UpdateChatAvatarParams{
+		ID:        chat_id,
+		AvatarUrl: &avatarUrl,
 	})
 }
 

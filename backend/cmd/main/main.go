@@ -64,6 +64,16 @@ func main() {
 	// repository
 	repo := repository.New(pool)
 
+	fileStorageUrl := os.Getenv("FILE_STORAGE_URL")
+	if fileStorageUrl == "" {
+		fileStorageUrl = "http://localhost:3001"
+	}
+
+	publicFileStorageUrl := os.Getenv("PUBLIC_FILE_STORAGE_URL")
+	if publicFileStorageUrl == "" {
+		publicFileStorageUrl = fileStorageUrl
+	}
+
 	// services
 	auth_service := services.NewAuthService("secret")
 	user_service := services.NewUserService(repo, auth_service)
@@ -76,8 +86,8 @@ func main() {
 	}
 
 	// controllers
-	user_controller := controllers.NewUserController(user_service, auth_service)
-	chat_controller := controllers.NewChatController(chat_service, user_service, pubsub_service, webpush_service, auth_service)
+	user_controller := controllers.NewUserController(user_service, auth_service, fileStorageUrl, publicFileStorageUrl)
+	chat_controller := controllers.NewChatController(chat_service, user_service, pubsub_service, webpush_service, auth_service, fileStorageUrl, publicFileStorageUrl)
 	topic_controller := controllers.NewTopicController(topic_service, user_service, webpush_service, auth_service)
 	pubsub_controller := controllers.NewPubSubController(pubsub_service, webpush_service, auth_service)
 	invitation_controller := controllers.NewInvitationController(chat_service, auth_service)

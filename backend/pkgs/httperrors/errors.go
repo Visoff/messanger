@@ -194,6 +194,26 @@ func (e *HTTPUnauthorizedError) Status() string {
 	return "Unauthorized"
 }
 
+type HTTPForbiddenError struct {
+	msg string
+}
+
+func NewHTTPForbiddenError(msg string) *HTTPForbiddenError {
+	return &HTTPForbiddenError{msg: msg}
+}
+
+func (e *HTTPForbiddenError) Error() string {
+	return e.msg
+}
+
+func (e *HTTPForbiddenError) StatusCode() int {
+	return 403
+}
+
+func (e *HTTPForbiddenError) Status() string {
+	return "Forbidden"
+}
+
 type HTTPConflictError struct {
 	msg string
 }

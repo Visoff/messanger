@@ -7,7 +7,6 @@ package repository
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -106,6 +105,30 @@ func (q *Queries) GetChat(ctx context.Context, id uuid.UUID) (*Chat, error) {
 	return &i, err
 }
 
+const getChatLastMessage = `-- name: GetChatLastMessage :one
+SELECT id, chat_id, topic_id, sender_id, reply_message_id, content, created_at, updated_at, deleted_at FROM messages
+WHERE chat_id = $1 AND deleted_at IS NULL
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetChatLastMessage(ctx context.Context, chatID uuid.UUID) (*Message, error) {
+	row := q.db.QueryRow(ctx, getChatLastMessage, chatID)
+	var i Message
+	err := row.Scan(
+		&i.ID,
+		&i.ChatID,
+		&i.TopicID,
+		&i.SenderID,
+		&i.ReplyMessageID,
+		&i.Content,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return &i, err
+}
+
 const joinUserToChat = `-- name: JoinUserToChat :exec
 INSERT INTO chat_members (
     user_id,
@@ -196,57 +219,31 @@ func (q *Queries) ListChats(ctx context.Context, userID uuid.UUID) ([]*Chat, err
 	return items, nil
 }
 
-const listChatsWithLastMessage = `-- name: ListChatsWithLastMessage :many
-SELECT chats.id, chats.title, chats.type, chats.avatar_url, chats.metadata, chats.created_at, chats.updated_at, chats.deleted_at,
-       m.id as m_id, m.chat_id as m_chat_id, m.topic_id as m_topic_id, m.sender_id as m_sender_id,
-       m.reply_message_id as m_reply_message_id, m.content as m_content,
-       m.created_at as m_created_at, m.updated_at as m_updated_at, m.deleted_at as m_deleted_at
-FROM chats
-LEFT JOIN chat_members ON chat_members.chat_id = chats.id
-LEFT JOIN LATERAL (
-    SELECT id, chat_id, topic_id, sender_id, reply_message_id, content, created_at, updated_at, deleted_at FROM messages
-    WHERE messages.chat_id = chats.id AND messages.deleted_at IS NULL
-    ORDER BY messages.created_at DESC
-    LIMIT 1
-) m ON true
-WHERE chat_members.user_id = $1
+const listUserChats = `-- name: ListUserChats :many
+SELECT c.id, c.title, c.type, c.avatar_url, c.metadata, c.created_at, c.updated_at, c.deleted_at FROM chats c
+JOIN chat_members cm ON cm.chat_id = c.id
+WHERE cm.user_id = $1
+ORDER BY c.updated_at DESC
 `
 
-type ListChatsWithLastMessageRow struct {
-	ID        uuid.UUID  `json:"id"`
-	Title     string     `json:"title"`
-	Type      ChatType   `json:"type"`
-	AvatarUrl *string    `json:"avatar_url"`
-	Metadata  []byte     `json:"metadata"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at"`
-	MsgID             *uuid.UUID `json:"msg_id"`
-	MsgChatID         *uuid.UUID `json:"msg_chat_id"`
-	MsgTopicID        *uuid.UUID `json:"msg_topic_id"`
-	MsgSenderID       *uuid.UUID `json:"msg_sender_id"`
-	MsgReplyMessageID *uuid.UUID `json:"msg_reply_message_id"`
-	MsgContent        *string    `json:"msg_content"`
-	MsgCreatedAt      *time.Time `json:"msg_created_at"`
-	MsgUpdatedAt      *time.Time `json:"msg_updated_at"`
-	MsgDeletedAt      *time.Time `json:"msg_deleted_at"`
-}
-
-func (q *Queries) ListChatsWithLastMessage(ctx context.Context, userID uuid.UUID) ([]*ListChatsWithLastMessageRow, error) {
-	rows, err := q.db.Query(ctx, listChatsWithLastMessage, userID)
+func (q *Queries) ListUserChats(ctx context.Context, userID uuid.UUID) ([]*Chat, error) {
+	rows, err := q.db.Query(ctx, listUserChats, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*ListChatsWithLastMessageRow
+	var items []*Chat
 	for rows.Next() {
-		var i ListChatsWithLastMessageRow
+		var i Chat
 		if err := rows.Scan(
-			&i.ID, &i.Title, &i.Type, &i.AvatarUrl,
-			&i.Metadata, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
-			&i.MsgID, &i.MsgChatID, &i.MsgTopicID, &i.MsgSenderID,
-			&i.MsgReplyMessageID, &i.MsgContent,
-			&i.MsgCreatedAt, &i.MsgUpdatedAt, &i.MsgDeletedAt,
+			&i.ID,
+			&i.Title,
+			&i.Type,
+			&i.AvatarUrl,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -289,6 +286,34 @@ type UpdateChatParams struct {
 
 func (q *Queries) UpdateChat(ctx context.Context, arg *UpdateChatParams) (*Chat, error) {
 	row := q.db.QueryRow(ctx, updateChat, arg.ID, arg.Title, arg.Metadata)
+	var i Chat
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Type,
+		&i.AvatarUrl,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return &i, err
+}
+
+const updateChatAvatar = `-- name: UpdateChatAvatar :one
+UPDATE chats SET
+    avatar_url = $2,
+    updated_at = NOW()
+WHERE id = $1 RETURNING id, title, type, avatar_url, metadata, created_at, updated_at, deleted_at
+`
+
+type UpdateChatAvatarParams struct {
+	ID        uuid.UUID `json:"id"`
+	AvatarUrl *string   `json:"avatar_url"`
+}
+
+func (q *Queries) UpdateChatAvatar(ctx context.Context, arg *UpdateChatAvatarParams) (*Chat, error) {
+	row := q.db.QueryRow(ctx, updateChatAvatar, arg.ID, arg.AvatarUrl)
 	var i Chat
 	err := row.Scan(
 		&i.ID,

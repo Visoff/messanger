@@ -1,6 +1,7 @@
 <script lang="ts">
     import Dialog from "./Dialog.svelte";
-    import { fetchChat, fetchChatMembers, InviteUserToChat, updateChat, leaveChat, muteChat, createInvitation } from "$lib/api/chats";
+    import PrivateChatInfo from "./PrivateChatInfo.svelte";
+    import { fetchChat, fetchChatMembers, InviteUserToChat, updateChat, leaveChat, muteChat, createInvitation, uploadChatAvatar } from "$lib/api/chats";
     import { fetchTopic, createTopic } from "$lib/api/topics";
     import { resolveUsername } from "$lib/api/users";
     import type { Chat, Topic, TopicType, User } from "$lib/types";
@@ -30,6 +31,14 @@
     let editingTitle = $state(false);
     let editTitleValue = $state("");
     let invitationLink = $state("");
+    let uploadingAvatar = $state(false);
+    let avatarFileInput: HTMLInputElement;
+
+    let otherUser = $derived(
+        chatData?.type === "private"
+            ? members.find(m => m.id !== $user?.id) ?? null
+            : null
+    );
 
     export function open() {
         dialog.open();
@@ -195,6 +204,23 @@
     function getInitials(name: string): string {
         return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     }
+
+    async function handleChatAvatarUpload(e: Event) {
+        const target = e.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (!file || !chatData) return;
+
+        uploadingAvatar = true;
+        error = "";
+        const resp = await uploadChatAvatar(chat_id, file);
+        if ("error" in resp) {
+            error = resp.error ?? "Failed to upload avatar";
+        } else {
+            chatData = resp;
+        }
+        uploadingAvatar = false;
+        target.value = "";
+    }
 </script>
 
 <Dialog bind:this={dialog}>
@@ -210,50 +236,70 @@
             <div class="text-red-500 py-3 text-center">{error}</div>
             <button type="button" onclick={close} class="self-end px-4 py-1.5 bg-gray-300 hover:bg-gray-400 rounded-lg text-sm transition-colors">Close</button>
         {:else if chatData}
-            <div class="flex items-center justify-between">
-                {#if editingTitle}
-                    <div class="flex gap-1 flex-1">
-                        <input class="border rounded px-2 py-1 text-sm flex-1" bind:value={editTitleValue} />
-                        <button type="button" onclick={handleRename} class="px-2 py-1 bg-blue-500 text-white rounded text-xs">Save</button>
-                        <button type="button" onclick={() => editingTitle = false} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Cancel</button>
-                    </div>
-                {:else}
-                    <button type="button" onclick={() => { editTitleValue = chatData.title; editingTitle = true; }} class="text-xl font-bold hover:text-blue-600 transition-colors text-left">{chatData.title} ✎</button>
-                {/if}
-                <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{typeLabel(chatData.type)}</span>
-            </div>
-            <div class="text-sm text-gray-600 space-y-1">
-                <div class="flex justify-between">
-                    <span class="text-gray-500">ID</span>
-                    <span class="font-mono text-xs">{chatData.id}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Created</span>
-                    <span>{formatDate(chatData.created_at)}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Updated</span>
-                    <span>{formatDate(chatData.updated_at)}</span>
-                </div>
-            </div>
-
-            {#if members.length > 0}
-                <div class="border-t border-gray-400 pt-2">
-                    <h3 class="text-sm font-semibold text-gray-700 mb-1">Members ({members.length})</h3>
-                    <div class="max-h-32 overflow-y-auto space-y-1">
-                        {#each members as member (member.id)}
-                            <div class="flex items-center gap-2 text-xs">
-                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
-                                    {getInitials(member.username)}
-                                </div>
-                                <span class="truncate">{member.username}</span>
-                                {#if member.id === $user?.id}
-                                    <span class="text-gray-400">(you)</span>
-                                {/if}
+            {#if chatData.type === "private" && otherUser}
+                <PrivateChatInfo {otherUser} />
+            {:else}
+                <div class="flex items-center gap-3">
+                    <button onclick={() => avatarFileInput?.click()} class="relative w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-base overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity group" title="Change chat avatar">
+                        {#if chatData.avatar_url}
+                            <img src={chatData.avatar_url} alt="avatar" class="w-full h-full object-cover" />
+                        {:else}
+                            {getInitials(chatData.title)}
+                        {/if}
+                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M17 5h-1.5l-1-1h-5l-1 1H7v2h10V5zM7 7v10a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7z"/></svg>
+                        </div>
+                    </button>
+                    <input bind:this={avatarFileInput} type="file" accept="image/*" class="hidden" onchange={handleChatAvatarUpload} />
+                    <div class="flex-1">
+                        {#if editingTitle}
+                            <div class="flex gap-1">
+                                <input class="border rounded px-2 py-1 text-sm flex-1" bind:value={editTitleValue} />
+                                <button type="button" onclick={handleRename} class="px-2 py-1 bg-blue-500 text-white rounded text-xs">Save</button>
+                                <button type="button" onclick={() => editingTitle = false} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Cancel</button>
                             </div>
-                        {/each}
+                        {:else}
+                            <button type="button" onclick={() => { editTitleValue = chatData.title; editingTitle = true; }} class="text-xl font-bold hover:text-blue-600 transition-colors text-left">{chatData.title} ✎</button>
+                        {/if}
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{typeLabel(chatData.type)}</span>
                     </div>
                 </div>
+                {#if uploadingAvatar}
+                    <div class="text-xs text-gray-500 text-center">Uploading avatar...</div>
+                {/if}
+                <div class="text-sm text-gray-600 space-y-1">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">ID</span>
+                        <span class="font-mono text-xs">{chatData.id}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Created</span>
+                        <span>{formatDate(chatData.created_at)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Updated</span>
+                        <span>{formatDate(chatData.updated_at)}</span>
+                    </div>
+                </div>
+
+                {#if members.length > 0}
+                    <div class="border-t border-gray-400 pt-2">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-1">Members ({members.length})</h3>
+                        <div class="max-h-32 overflow-y-auto space-y-1">
+                            {#each members as member (member.id)}
+                                <div class="flex items-center gap-2 text-xs">
+                                    <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+                                        {getInitials(member.username)}
+                                    </div>
+                                    <span class="truncate">{member.username}</span>
+                                    {#if member.id === $user?.id}
+                                        <span class="text-gray-400">(you)</span>
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+                    </div>
+                {/if}
             {/if}
 
             {#if invitationLink}
@@ -266,7 +312,7 @@
                 </div>
             {/if}
 
-            {#if showInviteInput}
+            {#if showInviteInput && chatData?.type !== "private"}
                 <div class="flex gap-1">
                     <input class="border rounded px-2 py-1 text-sm flex-1" placeholder="Username to invite" bind:value={inviteUsername} />
                     <button type="button" onclick={handleInviteUser} class="px-2 py-1 bg-blue-500 text-white rounded text-xs">Send</button>
@@ -300,9 +346,11 @@
             {/if}
 
             <div class="flex flex-wrap justify-center gap-2 pt-2 border-t border-gray-400">
-                <button type="button" onclick={() => showInviteInput = true} class="px-4 py-1.5 bg-blue-300 hover:bg-blue-400 rounded-lg text-sm transition-colors">Invite</button>
+                {#if chatData?.type !== "private"}
+                    <button type="button" onclick={() => showInviteInput = true} class="px-4 py-1.5 bg-blue-300 hover:bg-blue-400 rounded-lg text-sm transition-colors">Invite</button>
+                    <button type="button" onclick={handleCreateInvitation} class="px-4 py-1.5 bg-purple-300 hover:bg-purple-400 rounded-lg text-sm transition-colors">Get Invite Link</button>
+                {/if}
                 <button type="button" onclick={() => showNewTopic = true} class="px-4 py-1.5 bg-green-300 hover:bg-green-400 rounded-lg text-sm transition-colors">New Topic</button>
-                <button type="button" onclick={handleCreateInvitation} class="px-4 py-1.5 bg-purple-300 hover:bg-purple-400 rounded-lg text-sm transition-colors">Get Invite Link</button>
                 <button type="button" onclick={handleMute} class="px-4 py-1.5 bg-yellow-300 hover:bg-yellow-400 rounded-lg text-sm transition-colors">
                     {isMuted() ? 'Unmute' : 'Mute'}
                 </button>

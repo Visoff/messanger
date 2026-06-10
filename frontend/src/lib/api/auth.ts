@@ -36,6 +36,21 @@ export async function getMe(): Promise<User | ErrorResponse> {
     return data;
 }
 
+export async function uploadAvatar(file: File): Promise<User | ErrorResponse> {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const response = await fetch(`${API_URL}/users/me/avatar`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+    });
+    const data = await response.json();
+    return data;
+}
+
 export async function updateUser(data: { username?: string, avatar_url?: string | null }): Promise<User | ErrorResponse> {
     const token = localStorage.getItem('token');
     const response = await fetch(`${API_URL}/users/me`, {

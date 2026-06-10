@@ -16,7 +16,7 @@
     let messages: Message[] = $state([]);
     let inputValue: string = $state("");
     let messagesContainer: HTMLDivElement;
-    let userCache: Record<string, string> = $state({});
+    let userCache: Record<string, { username: string, avatar_url?: string }> = $state({});
     let replyToMessage: Message | null = $state(null);
 
     $effect(() => {
@@ -41,7 +41,7 @@
                         const resp2 = await fetch(`${API_URL}/users/id/${uid}`);
                         const u = await resp2.json();
                         if (!("error" in u)) {
-                            userCache[uid] = u.username;
+                            userCache[uid] = { username: u.username, avatar_url: u.avatar_url };
                         }
                     } catch {}
                 }
@@ -53,7 +53,12 @@
 
     function getSenderName(sender_id: string): string {
         if (sender_id === $user?.id) return "You";
-        return userCache[sender_id] || sender_id.slice(0, 8);
+        return userCache[sender_id]?.username || sender_id.slice(0, 8);
+    }
+
+    function getSenderAvatar(sender_id: string): string | undefined {
+        if (sender_id === $user?.id) return $user?.avatar_url;
+        return userCache[sender_id]?.avatar_url;
     }
 
     function getRepliedMessage(message: Message): Message | undefined {
@@ -140,6 +145,22 @@
     <div class="messages-wrapper" bind:this={messagesContainer}>
         {#each messages as message (message.id)}
             <div class="message-row" class:sent={message.sender_id === $user?.id}>
+                {#if message.sender_id !== $user?.id || $user?.avatar_url}
+                <div class="message-sidebar">
+                    {#if message.sender_id !== $user?.id}
+                        {@const avatar = getSenderAvatar(message.sender_id)}
+                        {#if avatar}
+                            <img src={avatar} alt="" class="w-8 h-8 rounded-full object-cover" />
+                        {:else}
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                                {getSenderName(message.sender_id)[0]}
+                            </div>
+                        {/if}
+                    {:else if $user?.avatar_url}
+                        <img src={$user.avatar_url} alt="" class="w-8 h-8 rounded-full object-cover" />
+                    {/if}
+                </div>
+                {/if}
                 <div class="message-bubble" class:received={message.sender_id !== $user?.id} id="msg-{message.id}">
                     {#if message.reply_message_id}
                         {@const replied = getRepliedMessage(message)}
@@ -221,14 +242,25 @@
 
     .message-row {
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: flex-end;
+        gap: 8px;
         padding: 0 60px 0 0;
     }
 
     .message-row.sent {
-        align-items: flex-end;
+        flex-direction: row-reverse;
         padding: 0 0 0 60px;
+    }
+
+    .message-row.sent .message-bubble {
+        border-top-left-radius: 18px;
+        border-top-right-radius: 4px;
+    }
+
+    .message-sidebar {
+        flex-shrink: 0;
+        margin-bottom: 8px;
     }
 
     .message-bubble {

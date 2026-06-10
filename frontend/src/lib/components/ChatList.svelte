@@ -59,7 +59,13 @@
             class:selected={current_chat_id === chat.id}
             onclick={selectChatEvent(chat.id)}
         >
-            <div class="avatar">{getInitials(chat.title)}</div>
+            <div class="avatar">
+                {#if chat.avatar_url}
+                    <img src={chat.avatar_url} alt="avatar" class="w-full h-full object-cover rounded-full" />
+                {:else}
+                    {getInitials(chat.title)}
+                {/if}
+            </div>
             <div class="chat-info">
                 <div class="chat-header">
                     <span class="chat-title">{chat.title}</span>

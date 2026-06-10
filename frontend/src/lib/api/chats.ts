@@ -112,6 +112,21 @@ export async function fetchChatMembers(chat_id: string): Promise<User[] | ErrorR
     return data;
 }
 
+export async function uploadChatAvatar(chat_id: string, file: File): Promise<Chat | ErrorResponse> {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const response = await fetch(`${API_URL}/chats/${chat_id}/avatar`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+    });
+    const data = await response.json();
+    return data;
+}
+
 export async function createInvitation(chat_id: string): Promise<{ id: string } | ErrorResponse> {
     const token = localStorage.getItem('token');
     const response = await fetch(`${API_URL}/chats/${chat_id}/invitation`, {

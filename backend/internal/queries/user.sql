@@ -19,3 +19,9 @@ UPDATE users SET
     metadata = $4,
     updated_at = NOW()
 WHERE id = $1 RETURNING *;
+
+-- name: UpdateUserAvatar :one
+UPDATE users SET
+    avatar_url = $2,
+    updated_at = NOW()
+WHERE id = $1 RETURNING *;

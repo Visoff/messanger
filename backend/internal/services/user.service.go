@@ -152,6 +152,21 @@ func (dto *UpdateUserDTO) Validate() error {
 	return nil
 }
 
+func (s *UserService) UpdateMyAvatar(ctx context.Context, avatarUrl string) (*DisplayUser, error) {
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {
+		return nil, err
+	}
+	user, err := s.repository.UpdateUserAvatar(ctx, &repository.UpdateUserAvatarParams{
+		ID:        user_id,
+		AvatarUrl: &avatarUrl,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.NewDisplayUser(user), nil
+}
+
 func (s *UserService) UpdateUser(ctx context.Context, dto *UpdateUserDTO) (*DisplayUser, error) {
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {
