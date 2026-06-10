@@ -213,23 +213,23 @@ WHERE chat_members.user_id = $1
 `
 
 type ListChatsWithLastMessageRow struct {
-	ID        uuid.UUID  `json:"id"`
-	Title     string     `json:"title"`
-	Type      ChatType   `json:"type"`
-	AvatarUrl *string    `json:"avatar_url"`
-	Metadata  []byte     `json:"metadata"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at"`
-	MsgID             *uuid.UUID `json:"msg_id"`
-	MsgChatID         *uuid.UUID `json:"msg_chat_id"`
-	MsgTopicID        *uuid.UUID `json:"msg_topic_id"`
-	MsgSenderID       *uuid.UUID `json:"msg_sender_id"`
-	MsgReplyMessageID *uuid.UUID `json:"msg_reply_message_id"`
-	MsgContent        *string    `json:"msg_content"`
-	MsgCreatedAt      *time.Time `json:"msg_created_at"`
-	MsgUpdatedAt      *time.Time `json:"msg_updated_at"`
-	MsgDeletedAt      *time.Time `json:"msg_deleted_at"`
+	ID              uuid.UUID  `json:"id"`
+	Title           string     `json:"title"`
+	Type            ChatType   `json:"type"`
+	AvatarUrl       *string    `json:"avatar_url"`
+	Metadata        []byte     `json:"metadata"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	DeletedAt       *time.Time `json:"deleted_at"`
+	MID             uuid.UUID  `json:"m_id"`
+	MChatID         uuid.UUID  `json:"m_chat_id"`
+	MTopicID        *uuid.UUID `json:"m_topic_id"`
+	MSenderID       uuid.UUID  `json:"m_sender_id"`
+	MReplyMessageID *uuid.UUID `json:"m_reply_message_id"`
+	MContent        *string    `json:"m_content"`
+	MCreatedAt      time.Time  `json:"m_created_at"`
+	MUpdatedAt      time.Time  `json:"m_updated_at"`
+	MDeletedAt      *time.Time `json:"m_deleted_at"`
 }
 
 func (q *Queries) ListChatsWithLastMessage(ctx context.Context, userID uuid.UUID) ([]*ListChatsWithLastMessageRow, error) {
@@ -242,11 +242,23 @@ func (q *Queries) ListChatsWithLastMessage(ctx context.Context, userID uuid.UUID
 	for rows.Next() {
 		var i ListChatsWithLastMessageRow
 		if err := rows.Scan(
-			&i.ID, &i.Title, &i.Type, &i.AvatarUrl,
-			&i.Metadata, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
-			&i.MsgID, &i.MsgChatID, &i.MsgTopicID, &i.MsgSenderID,
-			&i.MsgReplyMessageID, &i.MsgContent,
-			&i.MsgCreatedAt, &i.MsgUpdatedAt, &i.MsgDeletedAt,
+			&i.ID,
+			&i.Title,
+			&i.Type,
+			&i.AvatarUrl,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.MID,
+			&i.MChatID,
+			&i.MTopicID,
+			&i.MSenderID,
+			&i.MReplyMessageID,
+			&i.MContent,
+			&i.MCreatedAt,
+			&i.MUpdatedAt,
+			&i.MDeletedAt,
 		); err != nil {
 			return nil, err
 		}

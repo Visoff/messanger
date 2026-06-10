@@ -3,6 +3,7 @@
     import { fetchMessages, sendMessage } from "$lib/api/messages";
     import { fetchTopics } from "$lib/api/topics";
     import { user } from "$lib/stores/user";
+    import { newMessageEvent } from "$lib/stores/messages";
     import type { Message, Topic } from "$lib/types";
 
     const { chat_id, topic_id }: { chat_id: string, topic_id?: string } = $props();
@@ -80,7 +81,9 @@
                 (!topic_id || data.topic_id == topic_id)
             ) {
                 addOptimisticMessage(data);
+                newMessageEvent.set(data);
             } else {
+                newMessageEvent.set(data);
                 let content = data.content || "";
                 if (content.length > 50) {
                     content = content.slice(0, 50) + "...";
@@ -126,6 +129,7 @@
         inputValue = "";
         replyToMessage = null;
         addOptimisticMessage(resp);
+        newMessageEvent.set(resp);
     }
 
     function formatTime(date: Date): string {

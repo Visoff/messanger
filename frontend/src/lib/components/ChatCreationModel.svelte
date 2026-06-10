@@ -1,36 +1,44 @@
 <script lang="ts">
     import Dialog from "./Dialog.svelte";
     import { createChat, createPrivateChat } from "$lib/api/chats";
-    import { resolveUsername } from "$lib/api/users";
+    import { API_URL } from "$lib/api/env";
     import type { User } from "$lib/types";
 
     let dialog: Dialog;
     let userPopup: Dialog;
-    let dialog_mode: "group" | "private" | "channel" = "group";
+    let dialog_mode: "group" | "private" | "channel" = $state("group");
     let foundUser: User | null = $state(null);
     let searchError: string = $state("");
     let creating = $state(false);
+    let searching = $state(false);
+    let usernameInput: string = $state("");
 
-    function submitform(e: SubmitEvent) {
-        e.preventDefault();
-        if (dialog_mode == "group") {
-            creating = true;
-            const title = (e.target as HTMLFormElement)["title"].value;
-            createChat(title).then(() => {
-                location.reload();
-            });
-        } else if (dialog_mode == "private") {
-            const username = (e.target as HTMLFormElement)["username"].value;
-            searchError = "";
-            foundUser = null;
-            resolveUsername(username).then((user) => {
-                if ("error" in user) {
-                    searchError = user.error ?? "User not found";
-                    return;
-                }
-                foundUser = user;
-                userPopup.open();
-            });
+    let {
+        onchatstarted,
+    }: {
+        onchatstarted?: (chatId: string) => void;
+    } = $props();
+
+    async function handleSearch() {
+        if (!usernameInput.trim()) return;
+        searchError = "";
+        foundUser = null;
+        searching = true;
+
+        try {
+            const response = await fetch(`${API_URL}/users/username/${encodeURIComponent(usernameInput.trim())}`);
+            const user = await response.json();
+
+            if ("error" in user) {
+                searchError = "User not found";
+                return;
+            }
+            foundUser = user;
+            userPopup.open();
+        } catch {
+            searchError = "Network error. Is the server running?";
+        } finally {
+            searching = false;
         }
     }
 
@@ -39,13 +47,41 @@
         creating = true;
         const resp = await createPrivateChat(foundUser.id);
         if ("error" in resp) {
-            searchError = resp.error ?? "Failed to create chat";
+            if (resp.status === 409) {
+                const token = localStorage.getItem("token");
+                try {
+                    const chatsResp = await fetch(`${API_URL}/chats/`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    const chats = await chatsResp.json();
+                    const existing = chats.find((c: any) =>
+                        c.type === "private" &&
+                        c.title?.toLowerCase() === foundUser!.username.toLowerCase()
+                    );
+                    if (existing) {
+                        userPopup.close();
+                        dialog.close();
+                        onchatstarted?.(existing.id);
+                        return;
+                    }
+                } catch {}
+            }
+            searchError = "Chat already exists";
             creating = false;
             return;
         }
         userPopup.close();
         dialog.close();
-        location.reload();
+        onchatstarted?.(resp.id);
+    }
+
+    async function handleGroupCreate(e: SubmitEvent) {
+        e.preventDefault();
+        creating = true;
+        const title = (e.target as HTMLFormElement)["title"].value;
+        createChat(title).then(() => {
+            location.reload();
+        });
     }
 
     function startCall() {
@@ -66,33 +102,46 @@
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
         </svg>
     </button>
+
     <Dialog bind:this={dialog}>
-        <form
-            class="bg-gray-200 border border-gray-600 rounded-lg px-4 py-2 flex flex-col gap-2"
-            onsubmit={submitform}
-        >
-            <select
-                class="bold text-2xl"
-                oninput={(e) => {
-                    dialog_mode = (e.target as HTMLSelectElement).value as "group" | "private" | "channel";
-                }}
-                value={dialog_mode}
-            >
+        <div class="bg-gray-200 border border-gray-600 rounded-lg px-4 py-2 flex flex-col gap-2 min-w-64">
+            <select class="bold text-2xl" bind:value={dialog_mode}>
                 <option class="text-sm" value="group">Create Chat</option>
                 <option class="text-sm" value="private">Find User</option>
                 <option class="text-sm" value="channel">Create channel</option>
             </select>
+
             {#if dialog_mode === "group"}
-                <input type="text" name="title" placeholder="Chat name" />
+                <form onsubmit={handleGroupCreate}>
+                    <input type="text" name="title" placeholder="Chat name" class="w-full mb-2 p-1 rounded" />
+                    <button type="submit" class="w-full p-1 bg-blue-300 hover:bg-blue-400 rounded text-sm" disabled={creating}>
+                        {creating ? 'Creating...' : 'Create'}
+                    </button>
+                </form>
             {/if}
+
             {#if dialog_mode === "private"}
-                <input type="text" name="username" placeholder="Username" />
+                <div class="flex flex-col gap-2">
+                    <input
+                        type="text"
+                        placeholder="Username"
+                        bind:value={usernameInput}
+                        class="w-full p-1 rounded"
+                        onkeydown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                    />
+                    <button onclick={handleSearch} disabled={searching} class="w-full p-1 bg-blue-300 hover:bg-blue-400 rounded text-sm">
+                        {searching ? 'Searching...' : 'Search'}
+                    </button>
+                    {#if searchError}
+                        <div class="text-red-500 text-xs text-center">{searchError}</div>
+                    {/if}
+                </div>
             {/if}
+
             {#if dialog_mode === "channel"}
-                <input type="text" placeholder="Channel name" />
+                <input type="text" placeholder="Channel name" class="w-full p-1 rounded" />
             {/if}
-            <button type="submit">{creating ? 'Creating...' : 'Search'}</button>
-        </form>
+        </div>
     </Dialog>
 
     <Dialog bind:this={userPopup}>
@@ -108,7 +157,7 @@
                     {/if}
                 </div>
 
-                {#if searchError}
+                {#if searchError && foundUser}
                     <div class="text-red-500 text-xs text-center">{searchError}</div>
                 {/if}
 
