@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -13,8 +12,8 @@ import (
 )
 
 type UserService struct {
-	repository *repository.Queries
-	authService    *AuthService
+	repository  *repository.Queries
+	authService *AuthService
 }
 
 func NewUserService(repository *repository.Queries, authService *AuthService) *UserService {
@@ -26,31 +25,31 @@ type AccessToken struct {
 }
 
 type DisplayUser struct {
-	ID           uuid.UUID  `json:"id"`
-	Username     string     `json:"username"`
-	AvatarUrl    *string    `json:"avatar_url"`
-	Metadata     []byte     `json:"metadata"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	DeletedAt    *time.Time `json:"deleted_at"`
-	LastSeenAt   time.Time  `json:"last_seen_at"`
+	ID         uuid.UUID  `json:"id"`
+	Username   string     `json:"username"`
+	AvatarUrl  *string    `json:"avatar_url"`
+	Metadata   []byte     `json:"metadata"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+	DeletedAt  *time.Time `json:"deleted_at"`
+	LastSeenAt time.Time  `json:"last_seen_at"`
 }
 
-func (s *UserService)NewDisplayUser(user *repository.User) *DisplayUser {
+func (s *UserService) NewDisplayUser(user *repository.User) *DisplayUser {
 	return &DisplayUser{
-		ID:           user.ID,
-		Username:     user.Username,
-		AvatarUrl:    user.AvatarUrl,
-		Metadata:     user.Metadata,
-		CreatedAt:    user.CreatedAt,
-		UpdatedAt:    user.UpdatedAt,
-		DeletedAt:    user.DeletedAt,
-		LastSeenAt:   user.LastSeenAt,
+		ID:         user.ID,
+		Username:   user.Username,
+		AvatarUrl:  user.AvatarUrl,
+		Metadata:   user.Metadata,
+		CreatedAt:  user.CreatedAt,
+		UpdatedAt:  user.UpdatedAt,
+		DeletedAt:  user.DeletedAt,
+		LastSeenAt: user.LastSeenAt,
 	}
 }
 
 type RegisterUserDTO struct {
-	Username     string `json:"username"`
+	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
@@ -67,7 +66,7 @@ func (dto *RegisterUserDTO) Validate() error {
 
 func (s *UserService) RegisterUser(ctx context.Context, dto *RegisterUserDTO) (*AccessToken, error) {
 	usr, err := s.repository.CreateUser(ctx, &repository.CreateUserParams{
-		Username: dto.Username,
+		Username:     dto.Username,
 		PasswordHash: s.authService.HashPassword(dto.Password),
 	})
 	if err != nil {
@@ -81,7 +80,7 @@ func (s *UserService) RegisterUser(ctx context.Context, dto *RegisterUserDTO) (*
 
 type LoginUserDTO struct {
 	Username string `json:"username"`
-	Password  string `json:"password"`
+	Password string `json:"password"`
 }
 
 func (dto *LoginUserDTO) Validate() error {
@@ -128,10 +127,18 @@ func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*
 	return user, nil
 }
 
+func (s *UserService) GetUserByID(ctx context.Context, id uuid.UUID) (*repository.User, error) {
+	user, err := s.repository.GetUserById(ctx, id)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("User not found")
+	}
+	return user, nil
+}
+
 type UpdateUserDTO struct {
-	Username  string          `json:"username"`
-	AvatarUrl *string         `json:"avatar_url"`
-	Metadata  json.RawMessage `json:"metadata"`
+	Username  string  `json:"username"`
+	AvatarUrl *string `json:"avatar_url"`
+	Metadata  *string  `json:"metadata"`
 }
 
 func (dto *UpdateUserDTO) Validate() error {
@@ -150,15 +157,15 @@ func (s *UserService) UpdateUser(ctx context.Context, dto *UpdateUserDTO) (*Disp
 	if err != nil {
 		return nil, err
 	}
-	metadata := []byte("{}")
+	metadata := "{}"
 	if dto.Metadata != nil {
-		metadata = dto.Metadata
+		metadata = *dto.Metadata
 	}
 	user, err := s.repository.UpdateUser(ctx, &repository.UpdateUserParams{
 		ID:        user_id,
 		Username:  dto.Username,
 		AvatarUrl: dto.AvatarUrl,
-		Metadata:  metadata,
+		Metadata:  []byte(metadata),
 	})
 	if err != nil {
 		return nil, err

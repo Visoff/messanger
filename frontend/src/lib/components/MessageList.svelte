@@ -37,7 +37,7 @@
             for (const uid of uniqueIds) {
                 if (!userCache[uid]) {
                     try {
-                        const resp2 = await fetch(`${API_URL}/users/username/${uid}`);
+                        const resp2 = await fetch(`${API_URL}/users/id/${uid}`);
                         const u = await resp2.json();
                         if (!("error" in u)) {
                             userCache[uid] = u.username;

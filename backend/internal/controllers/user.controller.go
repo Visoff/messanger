@@ -33,6 +33,7 @@ func NewUserController(userService *services.UserService, authService *services.
 	mux.Handle("GET /me", authService.ProtectRoute(handlers.Handler(c.GetMe)))
 	mux.Handle("PUT /me", authService.ProtectRoute(handlers.Handler(c.UpdateMe)))
 
+	mux.Handle("GET /id/{id}", handlers.Handler(c.GetUserByID))
 	mux.Handle("GET /username/{username}", handlers.Handler(c.GetUserByUsername))
 
 	//mux.Handle("GET /", handlers.Handler(c.Search))
@@ -166,6 +167,32 @@ func (c *UserController) GetUserByUsername(w http.ResponseWriter, r *http.Reques
 		return err
 	}
 	user, err := c.userService.GetUserByUsername(r.Context(), username)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(c.userService.NewDisplayUser(user))
+	return nil
+}
+
+// GetUserByID gets a user by ID.
+// @Summary      Get user by ID
+// @Description  Get a user by ID.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "User ID"
+// @Success      200  {object}  services.DisplayUser
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /users/id/{id} [get]
+func (c *UserController) GetUserByID(w http.ResponseWriter, r *http.Request) error {
+	uid, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	user, err := c.userService.GetUserByID(r.Context(), uid)
 	if err != nil {
 		return err
 	}
