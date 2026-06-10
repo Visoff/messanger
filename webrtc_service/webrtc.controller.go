@@ -141,6 +141,33 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	peer := &Peer{conn: conn, pc: pc}
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		ticker := time.NewTicker(25 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				peer.mu.Lock()
+				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				err := conn.WriteMessage(websocket.PingMessage, nil)
+				peer.mu.Unlock()
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
 
 	peer_id := uuid.New().String()
 	room.peersMU.Lock()
@@ -164,6 +191,7 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 		v.localTracks[k] = localTrack
 		v.localTracksMU.Unlock()
 	}
+	peer.ScheduleRenegotiation()
 
 	defer func() {
 		room.peersMU.Lock()
@@ -211,11 +239,7 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 			forwarder.localTracks[k] = localTrack
 			forwarder.localTracksMU.Unlock()
 
-			err = v.Renegotiate()
-			if err != nil {
-				log.Println(err)
-				continue
-			}
+			v.ScheduleRenegotiation()
 		}
 
 		go func() {
