@@ -7,6 +7,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -184,6 +185,68 @@ func (q *Queries) ListChats(ctx context.Context, userID uuid.UUID) ([]*Chat, err
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChatsWithLastMessage = `-- name: ListChatsWithLastMessage :many
+SELECT chats.id, chats.title, chats.type, chats.avatar_url, chats.metadata, chats.created_at, chats.updated_at, chats.deleted_at,
+       m.id as m_id, m.chat_id as m_chat_id, m.topic_id as m_topic_id, m.sender_id as m_sender_id,
+       m.reply_message_id as m_reply_message_id, m.content as m_content,
+       m.created_at as m_created_at, m.updated_at as m_updated_at, m.deleted_at as m_deleted_at
+FROM chats
+LEFT JOIN chat_members ON chat_members.chat_id = chats.id
+LEFT JOIN LATERAL (
+    SELECT id, chat_id, topic_id, sender_id, reply_message_id, content, created_at, updated_at, deleted_at FROM messages
+    WHERE messages.chat_id = chats.id AND messages.deleted_at IS NULL
+    ORDER BY messages.created_at DESC
+    LIMIT 1
+) m ON true
+WHERE chat_members.user_id = $1
+`
+
+type ListChatsWithLastMessageRow struct {
+	ID        uuid.UUID  `json:"id"`
+	Title     string     `json:"title"`
+	Type      ChatType   `json:"type"`
+	AvatarUrl *string    `json:"avatar_url"`
+	Metadata  []byte     `json:"metadata"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at"`
+	MsgID             *uuid.UUID `json:"msg_id"`
+	MsgChatID         *uuid.UUID `json:"msg_chat_id"`
+	MsgTopicID        *uuid.UUID `json:"msg_topic_id"`
+	MsgSenderID       *uuid.UUID `json:"msg_sender_id"`
+	MsgReplyMessageID *uuid.UUID `json:"msg_reply_message_id"`
+	MsgContent        *string    `json:"msg_content"`
+	MsgCreatedAt      *time.Time `json:"msg_created_at"`
+	MsgUpdatedAt      *time.Time `json:"msg_updated_at"`
+	MsgDeletedAt      *time.Time `json:"msg_deleted_at"`
+}
+
+func (q *Queries) ListChatsWithLastMessage(ctx context.Context, userID uuid.UUID) ([]*ListChatsWithLastMessageRow, error) {
+	rows, err := q.db.Query(ctx, listChatsWithLastMessage, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListChatsWithLastMessageRow
+	for rows.Next() {
+		var i ListChatsWithLastMessageRow
+		if err := rows.Scan(
+			&i.ID, &i.Title, &i.Type, &i.AvatarUrl,
+			&i.Metadata, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+			&i.MsgID, &i.MsgChatID, &i.MsgTopicID, &i.MsgSenderID,
+			&i.MsgReplyMessageID, &i.MsgContent,
+			&i.MsgCreatedAt, &i.MsgUpdatedAt, &i.MsgDeletedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -1,10 +1,10 @@
 <script lang="ts">
     import { fetchChats } from "$lib/api/chats";
-    import type { Chat } from "$lib/types";
+    import type { ChatWithLastMessage } from "$lib/types";
 
     const { onselect, current_chat_id, refreshKey }: { onselect: (id: string) => void, current_chat_id?: string, refreshKey?: number } = $props();
 
-    let chats: Chat[] = $state([]);
+    let chats: ChatWithLastMessage[] = $state([]);
 
     async function loadChats() {
         const resp = await fetchChats();
@@ -33,6 +33,23 @@
     function getInitials(title: string): string {
         return title.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     }
+
+    function formatTime(date: Date): string {
+        const now = Date.now();
+        const diff = now - new Date(date).getTime();
+        const min = 60_000;
+        const hour = 3_600_000;
+        const day = 86_400_000;
+        if (diff < min) return "now";
+        if (diff < hour) return `${Math.floor(diff / min)}m`;
+        if (diff < day) return `${Math.floor(diff / hour)}h`;
+        return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+
+    function previewText(msg: { content?: string } | null): string {
+        if (!msg?.content) return "No messages yet";
+        return msg.content.length > 100 ? msg.content.slice(0, 100) + "…" : msg.content;
+    }
 </script>
 
 <div class="chat-list">
@@ -46,9 +63,11 @@
             <div class="chat-info">
                 <div class="chat-header">
                     <span class="chat-title">{chat.title}</span>
-                    <span class="chat-time">now</span>
+                    {#if chat.last_message}
+                        <span class="chat-time">{formatTime(chat.last_message.created_at)}</span>
+                    {/if}
                 </div>
-                <div class="chat-preview">Tap to view messages</div>
+                <div class="chat-preview">{previewText(chat.last_message)}</div>
             </div>
         </button>
     {/each}

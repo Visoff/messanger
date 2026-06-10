@@ -17,15 +17,32 @@ func NewChatService(repository *repository.Queries) *ChatService {
 	return &ChatService{repository: repository}
 }
 
-func (s *ChatService) ListChats(ctx context.Context) ([]*repository.Chat, error) {
+type ChatWithLastMessage struct {
+	*repository.Chat
+	LastMessage *repository.Message `json:"last_message"`
+}
+
+func (s *ChatService) ListChats(ctx context.Context) ([]*ChatWithLastMessage, error) {
 	user_id, err := ExtractUserId(ctx)
-	if err != nil {return []*repository.Chat{}, err}
-	list, err := s.repository.ListChats(ctx, user_id)
+	if err != nil {return []*ChatWithLastMessage{}, err}
+	rows, err := s.repository.ListChatsWithLastMessage(ctx, user_id)
 	if err != nil {
-		return []*repository.Chat{}, nil
+		return []*ChatWithLastMessage{}, nil
 	}
 
-	for _, chat := range list {
+	result := make([]*ChatWithLastMessage, 0, len(rows))
+	for _, row := range rows {
+		chat := &repository.Chat{
+			ID:        row.ID,
+			Title:     row.Title,
+			Type:      row.Type,
+			AvatarUrl: row.AvatarUrl,
+			Metadata:  row.Metadata,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+			DeletedAt: row.DeletedAt,
+		}
+
 		if chat.Type == repository.ChatTypePrivate && chat.Title == "" {
 			members, err := s.repository.ListChatMembers(ctx, chat.ID)
 			if err == nil {
@@ -37,9 +54,26 @@ func (s *ChatService) ListChats(ctx context.Context) ([]*repository.Chat, error)
 				}
 			}
 		}
+
+		item := &ChatWithLastMessage{Chat: chat}
+		if row.MsgID != nil {
+			item.LastMessage = &repository.Message{
+				ID:             *row.MsgID,
+				ChatID:         *row.MsgChatID,
+				TopicID:        row.MsgTopicID,
+				SenderID:       *row.MsgSenderID,
+				ReplyMessageID: row.MsgReplyMessageID,
+				Content:        row.MsgContent,
+				CreatedAt:      *row.MsgCreatedAt,
+				UpdatedAt:      *row.MsgUpdatedAt,
+				DeletedAt:      row.MsgDeletedAt,
+			}
+		}
+
+		result = append(result, item)
 	}
 
-	return list, nil
+	return result, nil
 }
 
 type CreateChatDTO struct {

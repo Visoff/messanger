@@ -52,3 +52,7 @@ export type Message = {
     updated_at: Date,
     deleted_at: Date
 };
+
+export type ChatWithLastMessage = Chat & {
+    last_message: Message | null;
+};

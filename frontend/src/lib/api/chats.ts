@@ -1,7 +1,7 @@
 import { API_URL } from "./env";
-import type { Chat, User, ErrorResponse } from '../types';
+import type { Chat, ChatWithLastMessage, User, ErrorResponse } from '../types';
 
-export async function fetchChats(): Promise<Chat[] | ErrorResponse> {
+export async function fetchChats(): Promise<ChatWithLastMessage[] | ErrorResponse> {
     const token = localStorage.getItem('token');
     const response = await fetch(`${API_URL}/chats/`, {
         headers: {

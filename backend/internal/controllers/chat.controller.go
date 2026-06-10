@@ -63,13 +63,13 @@ func (c *ChatController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.mux.ServeHTTP(w, r)
 }
 
-// ListChats returns a list of all chats.
+// ListChats returns a list of all chats with their last message.
 // @Summary      List all chats
-// @Description  Returns a list of all chats.
+// @Description  Returns a list of all chats with their most recent message.
 // @Tags         chats
 // @Accept       json
 // @Produce      json
-// @Success      200  {object}  []repository.Chat
+// @Success      200  {object}  []services.ChatWithLastMessage
 // @Failure      400  {object}  httperrors.ErrorResponse
 // @Failure      401  {object}  httperrors.ErrorResponse
 // @Failure      500  {object}  httperrors.ErrorResponse

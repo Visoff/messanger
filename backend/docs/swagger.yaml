@@ -97,6 +97,29 @@ definitions:
       token:
         type: string
     type: object
+  services.ChatWithLastMessage:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      id:
+        type: string
+      last_message:
+        $ref: '#/definitions/repository.Message'
+      metadata:
+        items:
+          type: integer
+        type: array
+      title:
+        type: string
+      type:
+        $ref: '#/definitions/repository.ChatType'
+      updated_at:
+        type: string
+    type: object
   services.CreateChatDTO:
     properties:
       title:
@@ -185,7 +208,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Returns a list of all chats.
+      description: Returns a list of all chats with their most recent message.
       produces:
       - application/json
       responses:
@@ -193,7 +216,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/repository.Chat'
+              $ref: '#/definitions/services.ChatWithLastMessage'
             type: array
         "400":
           description: Bad Request
