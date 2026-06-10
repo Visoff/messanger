@@ -181,7 +181,11 @@ func (s *ChatService) InviteUser(ctx context.Context, chat_id uuid.UUID, user_id
 	})
 }
 
-func (s *ChatService) CreateInvitation(ctx context.Context, chat_id uuid.UUID) (*uuid.UUID, error) {
+type InvitationResponse struct {
+	ID uuid.UUID `json:"id"`
+}
+
+func (s *ChatService) CreateInvitation(ctx context.Context, chat_id uuid.UUID) (*InvitationResponse, error) {
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return nil, err}
 
@@ -190,7 +194,7 @@ func (s *ChatService) CreateInvitation(ctx context.Context, chat_id uuid.UUID) (
 		ChatID: chat_id,
 	})
 	if err == nil && existing != nil {
-		return &existing.ID, nil
+		return &InvitationResponse{ID: existing.ID}, nil
 	}
 
 	id, err := s.repository.CreateChatInvitation(ctx, &repository.CreateChatInvitationParams{
@@ -198,7 +202,7 @@ func (s *ChatService) CreateInvitation(ctx context.Context, chat_id uuid.UUID) (
 		UserID: user_id,
 	})
 	if err != nil {return nil, err}
-	return &id, nil
+	return &InvitationResponse{ID: id}, nil
 }
 
 func (s *ChatService) GetInvitation(ctx context.Context, id uuid.UUID) (*repository.Invitation, error) {
