@@ -51,13 +51,11 @@ export async function createPrivateChat(user_id: string): Promise<Chat | ErrorRe
 
 export async function InviteUserToChat(chat_id: string, user_id: string): Promise<Chat | ErrorResponse> {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/chats/${chat_id}/invite`, {
+    const response = await fetch(`${API_URL}/chats/${chat_id}/invite/${user_id}`, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ user_id }),
     });
     const data = await response.json();
     return data;

@@ -1,7 +1,8 @@
 <script lang="ts">
     import Dialog from "./Dialog.svelte";
-    import { fetchChat } from "$lib/api/chats";
-    import { fetchTopic } from "$lib/api/topics";
+    import { fetchChat, InviteUserToChat } from "$lib/api/chats";
+    import { fetchTopic, createTopic } from "$lib/api/topics";
+    import { resolveUsername } from "$lib/api/users";
     import type { Chat, Topic } from "$lib/types";
 
     let {
@@ -77,6 +78,33 @@
             default: return type;
         }
     }
+
+    async function handleCreateTopic() {
+        const title = prompt("Topic name:");
+        if (!title) return;
+        const resp = await createTopic(chat_id, title, "text_topic");
+        if ("error" in resp) {
+            alert(resp.error ?? "Failed to create topic");
+        } else {
+            alert(`Topic "${resp.title}" created`);
+        }
+    }
+
+    async function handleInviteUser() {
+        const username = prompt("Username to invite:");
+        if (!username) return;
+        const user = await resolveUsername(username);
+        if ("error" in user) {
+            alert(user.error ?? "User not found");
+            return;
+        }
+        const resp = await InviteUserToChat(chat_id, user.id);
+        if ("error" in resp) {
+            alert(resp.error ?? "Failed to invite user");
+        } else {
+            alert(`User "${user.username}" invited`);
+        }
+    }
 </script>
 
 <Dialog bind:this={dialog}>
@@ -110,7 +138,9 @@
                     <span>{formatDate(chatData.updated_at)}</span>
                 </div>
             </div>
-            <div class="flex justify-end">
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick={handleInviteUser} class="px-4 py-1.5 bg-blue-300 hover:bg-blue-400 rounded-lg text-sm transition-colors">Invite</button>
+                <button type="button" onclick={handleCreateTopic} class="px-4 py-1.5 bg-green-300 hover:bg-green-400 rounded-lg text-sm transition-colors">New Topic</button>
                 <button type="button" onclick={close} class="px-4 py-1.5 bg-gray-300 hover:bg-gray-400 rounded-lg text-sm transition-colors">Close</button>
             </div>
         {:else if topicData}
