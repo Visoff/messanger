@@ -57,20 +57,11 @@ WHERE chats.type = 'private'
   AND cm2.user_id = $2
 LIMIT 1;
 
--- name: ListChatsWithLastMessage :many
-SELECT chats.id, chats.title, chats.type, chats.avatar_url, chats.metadata, chats.created_at, chats.updated_at, chats.deleted_at,
-       m.id as m_id, m.chat_id as m_chat_id, m.topic_id as m_topic_id, m.sender_id as m_sender_id,
-       m.reply_message_id as m_reply_message_id, m.content as m_content,
-       m.created_at as m_created_at, m.updated_at as m_updated_at, m.deleted_at as m_deleted_at
-FROM chats
-LEFT JOIN chat_members ON chat_members.chat_id = chats.id
-LEFT JOIN LATERAL (
-    SELECT * FROM messages
-    WHERE messages.chat_id = chats.id AND messages.deleted_at IS NULL
-    ORDER BY messages.created_at DESC
-    LIMIT 1
-) m ON true
-WHERE chat_members.user_id = $1;
+-- name: ListChatsLastMessages :many
+SELECT DISTINCT ON (messages.chat_id) * FROM messages
+WHERE messages.chat_id = ANY($1::uuid[])
+  AND messages.deleted_at IS NULL
+ORDER BY messages.chat_id, messages.created_at DESC;
 
 -- name: UpdateChatMuted :one
 UPDATE chats SET

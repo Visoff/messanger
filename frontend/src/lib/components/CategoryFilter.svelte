@@ -1,11 +1,9 @@
 <script lang="ts">
     import { user } from "$lib/stores/user";
+    import { fetchCategories, createCategory } from "$lib/api/categories";
+    import type { UserCategoryResponse } from "$lib/api/categories";
 
-    export interface UserCategory {
-        id: string;
-        name: string;
-        chatIds: string[];
-    }
+    export type UserCategory = UserCategoryResponse;
 
     let {
         activeCategory,
@@ -23,23 +21,23 @@
     let newCategoryName = $state("");
     let showAddChatInput = $state(false);
     let newChatTitle = $state("");
+    let loading = $state(false);
 
-    function storageKey(): string {
-        return `categories_${$user?.id || "default"}`;
-    }
-
-    function loadCategories() {
+    async function loadCategories() {
+        loading = true;
         try {
-            const key = storageKey();
-            const stored = localStorage.getItem(key);
-            categories = stored ? JSON.parse(stored) : [];
+            const resp = await fetchCategories();
+            if ("error" in resp) {
+                console.error(resp.error);
+                categories = [];
+            } else {
+                categories = resp;
+            }
         } catch {
             categories = [];
+        } finally {
+            loading = false;
         }
-    }
-
-    function saveCategories() {
-        localStorage.setItem(storageKey(), JSON.stringify(categories));
     }
 
     let prevUserId: string | undefined;
@@ -76,17 +74,16 @@
         isOpen = false;
     }
 
-    function createCategory() {
+    async function createNewCategory() {
         if (!newCategoryName.trim()) return;
-        const newCat: UserCategory = {
-            id: crypto.randomUUID(),
-            name: newCategoryName.trim(),
-            chatIds: [],
-        };
-        categories = [...categories, newCat];
-        saveCategories();
+        const resp = await createCategory(newCategoryName.trim());
+        if ("error" in resp) {
+            console.error(resp.error);
+            return;
+        }
+        categories = [...categories, resp];
         showAddCategory = false;
-        selectCategory(newCat);
+        selectCategory(resp);
     }
 
     function handleAddChatClick() {
@@ -149,9 +146,9 @@
                         type="text"
                         placeholder="Category name"
                         bind:value={newCategoryName}
-                        onkeydown={(e) => { if (e.key === 'Enter') createCategory(); }}
+                        onkeydown={(e) => { if (e.key === 'Enter') createNewCategory(); }}
                     />
-                    <button onclick={createCategory}>Create</button>
+                    <button onclick={createNewCategory} disabled={loading}>Create</button>
                 </div>
             {:else}
                 <button class="dropdown-item add-category-btn" onclick={() => { showAddCategory = true; }}>
@@ -171,7 +168,7 @@
                         bind:value={newChatTitle}
                         onkeydown={(e) => { if (e.key === 'Enter') confirmAddChat(); }}
                     />
-                    <button onclick={confirmAddChat}>Add</button>
+                    <button onclick={confirmAddChat} disabled={loading}>Add</button>
                     <button class="cancel-btn" onclick={() => { showAddChatInput = false; }}>Cancel</button>
                 </div>
             {:else}

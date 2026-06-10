@@ -3,6 +3,7 @@
     import ChatList from "$lib/components/ChatList.svelte";
     import CategoryFilter from "$lib/components/CategoryFilter.svelte";
     import type { UserCategory } from "$lib/components/CategoryFilter.svelte";
+    import { updateCategory } from "$lib/api/categories";
     import { onMount } from "svelte";
     import { getMe } from "$lib/api/auth";
     import ChatCreationModel from "$lib/components/ChatCreationModel.svelte";
@@ -117,22 +118,20 @@
         }
     }
 
-    function storageKey(): string {
-        return `categories_${$user?.id || "default"}`;
-    }
-
-    function handleAddChatToCategory(categoryId: string, chatTitle: string) {
+    async function handleAddChatToCategory(categoryId: string, chatTitle: string) {
         const chat = loadedChats.find(c => c.title.toLowerCase() === chatTitle.toLowerCase());
         if (!chat) return;
-        const stored = localStorage.getItem(storageKey());
-        if (!stored) return;
-        const categories: UserCategory[] = JSON.parse(stored);
-        const idx = categories.findIndex(c => c.id === categoryId);
-        if (idx === -1) return;
-        if (categories[idx].chatIds.includes(chat.id)) return;
-        categories[idx].chatIds.push(chat.id);
-        localStorage.setItem(storageKey(), JSON.stringify(categories));
-        activeCategory = { mode: "category", category: categories[idx] };
+        const cat = activeCategory?.category;
+        if (!cat) return;
+        const chatIds = [...(cat.chat_ids || [])];
+        if (chatIds.includes(chat.id)) return;
+        chatIds.push(chat.id);
+        const resp = await updateCategory(categoryId, cat.name, chatIds);
+        if ("error" in resp) {
+            console.error(resp.error);
+            return;
+        }
+        activeCategory = { mode: "category", category: resp };
     }
 
     function getInitials(name: string | undefined): string {
@@ -175,7 +174,7 @@
             current_chat_id={chat_id}
             refreshKey={chatListRefreshKey}
             filterMode={activeCategory?.mode}
-            categoryChatIds={activeCategory?.category?.chatIds}
+            categoryChatIds={activeCategory?.category?.chat_ids}
             onchatsload={(chats) => { loadedChats = chats; }}
         />
     </div>
