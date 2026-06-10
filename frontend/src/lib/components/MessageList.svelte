@@ -16,6 +16,7 @@
     let messages: Message[] = $state([]);
     let inputValue: string = $state("");
     let messagesContainer: HTMLDivElement;
+    let userCache: Record<string, string> = $state({});
 
     $effect(() => {
         (async () => {
@@ -31,9 +32,28 @@
                 return;
             }
             chat_topics = resp1
+
+            const uniqueIds = [...new Set(resp.map(m => m.sender_id).filter(Boolean))];
+            for (const uid of uniqueIds) {
+                if (!userCache[uid]) {
+                    try {
+                        const resp2 = await fetch(`${API_URL}/users/username/${uid}`);
+                        const u = await resp2.json();
+                        if (!("error" in u)) {
+                            userCache[uid] = u.username;
+                        }
+                    } catch {}
+                }
+            }
+
             scrollToBottom();
         })();
     });
+
+    function getSenderName(sender_id: string): string {
+        if (sender_id === $user?.id) return "You";
+        return userCache[sender_id] || sender_id.slice(0, 8);
+    }
 
     function notify(title: string, body?: string) {
         Notification.requestPermission().then((permission) => {
@@ -99,6 +119,9 @@
         {#each messages as message (message.id)}
             <div class="message-row" class:sent={message.sender_id === $user?.id}>
                 <div class="message-bubble" class:received={message.sender_id !== $user?.id}>
+                    {#if message.sender_id !== $user?.id}
+                        <div class="message-sender">{getSenderName(message.sender_id)}</div>
+                    {/if}
                     <div class="message-content">{message.content}</div>
                     <div class="message-meta">
                     {#if topic_id == undefined && message.topic_id != undefined}
@@ -177,6 +200,13 @@
         font-size: 15px;
         line-height: 1.4;
         word-wrap: break-word;
+    }
+
+    .message-sender {
+        font-size: 11px;
+        font-weight: 600;
+        color: #2481d2;
+        margin-bottom: 2px;
     }
 
     .message-meta {

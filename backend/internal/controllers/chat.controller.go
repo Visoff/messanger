@@ -51,6 +51,10 @@ func NewChatController(chatService *services.ChatService, userService *services.
 
 	mux.Handle("POST /{id}/invite/{user_id}", authService.ProtectRoute(handlers.Handler(c.InviteUser)))
 	mux.Handle("POST /{id}/invitation", authService.ProtectRoute(handlers.Handler(c.CreateInvitation)))
+	mux.Handle("PUT /{id}", authService.ProtectRoute(handlers.Handler(c.UpdateChat)))
+	mux.Handle("POST /{id}/leave", authService.ProtectRoute(handlers.Handler(c.LeaveChat)))
+	mux.Handle("PUT /{id}/mute", authService.ProtectRoute(handlers.Handler(c.MuteChat)))
+	mux.Handle("GET /{id}/members", authService.ProtectRoute(handlers.Handler(c.ListChatMembers)))
 
 	return c
 }
@@ -105,6 +109,11 @@ func (c *ChatController) CreateChat(w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		return err
 	}
+
+	go c.pubsubService.Publish(context.Background(), chat.ID.String(), map[string]interface{}{
+		"type": "chat_created",
+		"chat": chat,
+	})
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(chat)
@@ -295,7 +304,18 @@ func (c *ChatController) InviteUser(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	err = c.chatService.InviteUser(r.Context(), chat_id, user_id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	go c.pubsubService.Publish(context.Background(), user_id.String(), map[string]interface{}{
+		"type": "user_added_to_chat",
+		"chat_id": chat_id.String(),
+	})
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	return nil
 }
 
 func (c *ChatController) CreatePrivateChat(w http.ResponseWriter, r *http.Request) error {
@@ -313,5 +333,77 @@ func (c *ChatController) CreatePrivateChat(w http.ResponseWriter, r *http.Reques
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(chat)
+	return nil
+}
+
+func (c *ChatController) UpdateChat(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	var dto services.UpdateChatDTO
+	if err := dtos.ParseFromBody(r, &dto); err != nil {
+		return err
+	}
+	chat, err := c.chatService.UpdateChat(r.Context(), chat_id, &dto)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(chat)
+	return nil
+}
+
+func (c *ChatController) LeaveChat(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	err = c.chatService.LeaveChat(r.Context(), chat_id)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	return nil
+}
+
+type MuteChatDTO struct {
+	Muted bool `json:"muted"`
+}
+
+func (d *MuteChatDTO) Validate() error {
+	return nil
+}
+
+func (c *ChatController) MuteChat(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	var dto MuteChatDTO
+	if err := dtos.ParseFromBody(r, &dto); err != nil {
+		return err
+	}
+	chat, err := c.chatService.MuteChat(r.Context(), chat_id, dto.Muted)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(chat)
+	return nil
+}
+
+func (c *ChatController) ListChatMembers(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	members, err := c.chatService.ListChatMembers(r.Context(), chat_id)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(members)
 	return nil
 }

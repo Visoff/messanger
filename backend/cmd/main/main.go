@@ -77,6 +77,7 @@ func main() {
 	chat_controller := controllers.NewChatController(chat_service, user_service, pubsub_service, webpush_service, auth_service)
 	topic_controller := controllers.NewTopicController(topic_service, user_service, webpush_service, auth_service)
 	pubsub_controller := controllers.NewPubSubController(pubsub_service, webpush_service, auth_service)
+	invitation_controller := controllers.NewInvitationController(chat_service, auth_service)
 
 	mux := http.NewServeMux()
 
@@ -84,6 +85,7 @@ func main() {
 	mux.Handle("/chats/", http.StripPrefix("/chats", chat_controller))
 	mux.Handle("/topics/", http.StripPrefix("/topics", topic_controller))
 	mux.Handle("/pubsub/", http.StripPrefix("/pubsub", pubsub_controller))
+	mux.Handle("/invitation/", http.StripPrefix("/invitation", invitation_controller))
 
 	mux.Handle("/docs/swagger.json", http.StripPrefix("/docs", http.FileServerFS(docs.Docs)))
 	mux.Handle("/docs/", httpswagger.Handler(

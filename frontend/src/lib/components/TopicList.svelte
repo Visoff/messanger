@@ -20,12 +20,18 @@
         })();
     });
 
-    function selectTopicEvent(topic_id: string) {
+    function selectTopicEvent(topic: Topic) {
         return () => {
-            onselect(topic_id);
-            const url = new URL(location.href);
-            url.searchParams.set("topic_id", topic_id);
-            history.pushState(null, "", url);
+            if (topic.type === 'voice_topic') {
+                const url = new URL(`${window.location.origin}/conference`);
+                url.searchParams.set("room_id", topic.id);
+                window.open(url.toString(), "_blank", "width=960,height=640,menubar=no,toolbar=no");
+                return;
+            }
+            onselect(topic.id);
+            const url2 = new URL(location.href);
+            url2.searchParams.set("topic_id", topic.id);
+            history.pushState(null, "", url2);
         }
     }
 </script>
@@ -37,15 +43,24 @@
         <button
             class="topic-item"
             class:selected={current_topic_id === topic.id}
-            onclick={selectTopicEvent(topic.id)}
+            onclick={selectTopicEvent(topic)}
         >
-            <div class="topic-avatar">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-                </svg>
+            <div class="topic-avatar" class:voice-topic={topic.type === 'voice_topic'}>
+                {#if topic.type === 'voice_topic'}
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                {:else}
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                {/if}
             </div>
             <div class="topic-info">
                 <span class="topic-title">{topic.title}</span>
+                {#if topic.type === 'voice_topic'}
+                    <span class="topic-badge">Voice</span>
+                {/if}
             </div>
         </button>
     {/each}
@@ -110,5 +125,16 @@
         font-weight: 500;
         font-size: 14px;
         color: #000000;
+    }
+
+    .topic-badge {
+        font-size: 10px;
+        color: #43a047;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .voice-topic {
+        background: #43a047;
     }
 </style>

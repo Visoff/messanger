@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -125,4 +126,42 @@ func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*
 		return nil, httperrors.NewHTTPNotFoundError("User not found")
 	}
 	return user, nil
+}
+
+type UpdateUserDTO struct {
+	Username  string          `json:"username"`
+	AvatarUrl *string         `json:"avatar_url"`
+	Metadata  json.RawMessage `json:"metadata"`
+}
+
+func (dto *UpdateUserDTO) Validate() error {
+	errors := make(map[string]string)
+	if dto.Username == "" {
+		errors["username"] = "Username is required"
+	}
+	if len(errors) > 0 {
+		return httperrors.NewHTTPValidationError(errors)
+	}
+	return nil
+}
+
+func (s *UserService) UpdateUser(ctx context.Context, dto *UpdateUserDTO) (*DisplayUser, error) {
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {
+		return nil, err
+	}
+	metadata := []byte("{}")
+	if dto.Metadata != nil {
+		metadata = dto.Metadata
+	}
+	user, err := s.repository.UpdateUser(ctx, &repository.UpdateUserParams{
+		ID:        user_id,
+		Username:  dto.Username,
+		AvatarUrl: dto.AvatarUrl,
+		Metadata:  metadata,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.NewDisplayUser(user), nil
 }

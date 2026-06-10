@@ -31,6 +31,7 @@ func NewUserController(userService *services.UserService, authService *services.
 	mux.Handle("POST /login", handlers.Handler(c.LoginUser))
 
 	mux.Handle("GET /me", authService.ProtectRoute(handlers.Handler(c.GetMe)))
+	mux.Handle("PUT /me", authService.ProtectRoute(handlers.Handler(c.UpdateMe)))
 
 	mux.Handle("GET /username/{username}", handlers.Handler(c.GetUserByUsername))
 
@@ -118,6 +119,32 @@ func (c *UserController) GetMe(w http.ResponseWriter, r *http.Request) error {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(c.userService.NewDisplayUser(user))
+	return nil
+}
+
+// UpdateMe updates the current user.
+// @Summary      Update current user
+// @Description  Update the current user's profile.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Param        request body services.UpdateUserDTO true "User details"
+// @Success      200  {object}  services.DisplayUser
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Router       /users/me [put]
+// @Security     BearerAuth
+func (c *UserController) UpdateMe(w http.ResponseWriter, r *http.Request) error {
+	var dto services.UpdateUserDTO
+	if err := dtos.ParseFromBody(r, &dto); err != nil {
+		return err
+	}
+	user, err := c.userService.UpdateUser(r.Context(), &dto)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
 	return nil
 }
 

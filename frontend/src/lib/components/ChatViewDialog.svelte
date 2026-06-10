@@ -1,9 +1,11 @@
 <script lang="ts">
     import Dialog from "./Dialog.svelte";
-    import { fetchChat, InviteUserToChat } from "$lib/api/chats";
+    import { fetchChat, fetchChatMembers, InviteUserToChat, updateChat, leaveChat, muteChat, createInvitation } from "$lib/api/chats";
     import { fetchTopic, createTopic } from "$lib/api/topics";
     import { resolveUsername } from "$lib/api/users";
-    import type { Chat, Topic } from "$lib/types";
+    import type { Chat, Topic, User } from "$lib/types";
+    import { API_URL } from "$lib/api/env";
+    import { user } from "$lib/stores/user";
 
     let {
         chat_id,
@@ -16,8 +18,17 @@
     let dialog: Dialog;
     let chatData: Chat | null = $state(null);
     let topicData: Topic | null = $state(null);
+    let members: User[] = $state([]);
     let loading = $state(false);
     let error = $state("");
+
+    let showInviteInput = $state(false);
+    let inviteUsername = $state("");
+    let showNewTopic = $state(false);
+    let newTopicName = $state("");
+    let editingTitle = $state(false);
+    let editTitleValue = $state("");
+    let invitationLink = $state("");
 
     export function open() {
         dialog.open();
@@ -33,14 +44,27 @@
         error = "";
         chatData = null;
         topicData = null;
+        members = [];
+        invitationLink = "";
+        showInviteInput = false;
+        showNewTopic = false;
+        editingTitle = false;
 
         try {
             if (!topic_id) {
-                const resp = await fetchChat(chat_id);
-                if ("error" in resp) {
-                    error = resp.error;
+                const [chatResp, membersResp] = await Promise.all([
+                    fetchChat(chat_id),
+                    fetchChatMembers(chat_id)
+                ]);
+                if ("error" in chatResp) {
+                    error = chatResp.error;
                 } else {
-                    chatData = resp;
+                    chatData = chatResp;
+                }
+                if (!("error" in membersResp)) {
+                    members = membersResp;
+                } else {
+                    console.error(membersResp.error);
                 }
             } else {
                 const resp = await fetchTopic(topic_id);
@@ -80,36 +104,89 @@
     }
 
     async function handleCreateTopic() {
-        const title = prompt("Topic name:");
-        if (!title) return;
-        const resp = await createTopic(chat_id, title, "text_topic");
+        if (!newTopicName.trim()) return;
+        const resp = await createTopic(chat_id, newTopicName, "text_topic");
         if ("error" in resp) {
-            alert(resp.error ?? "Failed to create topic");
+            error = resp.error ?? "Failed to create topic";
         } else {
-            alert(`Topic "${resp.title}" created`);
+            newTopicName = "";
+            showNewTopic = false;
         }
     }
 
     async function handleInviteUser() {
-        const username = prompt("Username to invite:");
-        if (!username) return;
-        const user = await resolveUsername(username);
-        if ("error" in user) {
-            alert(user.error ?? "User not found");
+        if (!inviteUsername.trim()) return;
+        const respUser = await resolveUsername(inviteUsername);
+        if ("error" in respUser) {
+            error = respUser.error ?? "User not found";
             return;
         }
-        const resp = await InviteUserToChat(chat_id, user.id);
+        const resp = await InviteUserToChat(chat_id, respUser.id);
         if ("error" in resp) {
-            alert(resp.error ?? "Failed to invite user");
+            error = resp.error ?? "Failed to invite user";
         } else {
-            alert(`User "${user.username}" invited`);
+            inviteUsername = "";
+            showInviteInput = false;
+            loadData();
         }
+    }
+
+    async function handleRename() {
+        if (!editTitleValue.trim() || !chatData) return;
+        const resp = await updateChat(chat_id, editTitleValue);
+        if ("error" in resp) {
+            error = resp.error ?? "Failed to rename chat";
+        } else {
+            chatData = resp;
+            editingTitle = false;
+        }
+    }
+
+    async function handleLeave() {
+        const resp = await leaveChat(chat_id);
+        if ("error" in resp) {
+            error = resp.error ?? "Failed to leave chat";
+        } else {
+            close();
+            window.location.reload();
+        }
+    }
+
+    async function handleCreateInvitation() {
+        const resp = await createInvitation(chat_id);
+        if ("error" in resp) {
+            error = resp.error ?? "Failed to create invitation";
+        } else {
+            invitationLink = `${API_URL}/invitation/${resp.id}`;
+        }
+    }
+
+    async function handleMute() {
+        const isMuted = !!(chatData?.metadata && JSON.parse(chatData.metadata as string)?.muted);
+        const resp = await muteChat(chat_id, !isMuted);
+        if ("error" in resp) {
+            error = resp.error ?? "Failed to toggle mute";
+        } else {
+            chatData = resp;
+        }
+    }
+
+    function isMuted(): boolean {
+        if (!chatData?.metadata) return false;
+        try {
+            const meta = JSON.parse(chatData.metadata as string);
+            return !!meta.muted;
+        } catch { return false; }
+    }
+
+    function getInitials(name: string): string {
+        return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     }
 </script>
 
 <Dialog bind:this={dialog}>
     <form
-        class="bg-gray-200 border border-gray-600 rounded-lg px-4 py-2 flex flex-col gap-2"
+        class="bg-gray-200 border border-gray-600 rounded-lg px-4 py-2 flex flex-col gap-2 min-w-72 max-w-md"
         onsubmit={(e) => e.preventDefault()}
     >
         {#if loading}
@@ -121,7 +198,15 @@
             <button type="button" onclick={close} class="self-end px-4 py-1.5 bg-gray-300 hover:bg-gray-400 rounded-lg text-sm transition-colors">Close</button>
         {:else if chatData}
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-bold">{chatData.title}</h2>
+                {#if editingTitle}
+                    <div class="flex gap-1 flex-1">
+                        <input class="border rounded px-2 py-1 text-sm flex-1" bind:value={editTitleValue} />
+                        <button type="button" onclick={handleRename} class="px-2 py-1 bg-blue-500 text-white rounded text-xs">Save</button>
+                        <button type="button" onclick={() => editingTitle = false} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Cancel</button>
+                    </div>
+                {:else}
+                    <button type="button" onclick={() => { editTitleValue = chatData.title; editingTitle = true; }} class="text-xl font-bold hover:text-blue-600 transition-colors text-left">{chatData.title} ✎</button>
+                {/if}
                 <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{typeLabel(chatData.type)}</span>
             </div>
             <div class="text-sm text-gray-600 space-y-1">
@@ -138,9 +223,60 @@
                     <span>{formatDate(chatData.updated_at)}</span>
                 </div>
             </div>
-            <div class="flex justify-end gap-2">
-                <button type="button" onclick={handleInviteUser} class="px-4 py-1.5 bg-blue-300 hover:bg-blue-400 rounded-lg text-sm transition-colors">Invite</button>
-                <button type="button" onclick={handleCreateTopic} class="px-4 py-1.5 bg-green-300 hover:bg-green-400 rounded-lg text-sm transition-colors">New Topic</button>
+
+            {#if members.length > 0}
+                <div class="border-t border-gray-400 pt-2">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-1">Members ({members.length})</h3>
+                    <div class="max-h-32 overflow-y-auto space-y-1">
+                        {#each members as member (member.id)}
+                            <div class="flex items-center gap-2 text-xs">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+                                    {getInitials(member.username)}
+                                </div>
+                                <span class="truncate">{member.username}</span>
+                                {#if member.id === $user?.id}
+                                    <span class="text-gray-400">(you)</span>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                </div>
+            {/if}
+
+            {#if invitationLink}
+                <div class="border-t border-gray-400 pt-2">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-1">Invitation Link</h3>
+                    <div class="flex gap-1">
+                        <input class="border rounded px-2 py-1 text-xs flex-1" readonly value={invitationLink} />
+                        <button type="button" onclick={() => { navigator.clipboard.writeText(invitationLink); }} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Copy</button>
+                    </div>
+                </div>
+            {/if}
+
+            {#if showInviteInput}
+                <div class="flex gap-1">
+                    <input class="border rounded px-2 py-1 text-sm flex-1" placeholder="Username to invite" bind:value={inviteUsername} />
+                    <button type="button" onclick={handleInviteUser} class="px-2 py-1 bg-blue-500 text-white rounded text-xs">Send</button>
+                    <button type="button" onclick={() => showInviteInput = false} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Cancel</button>
+                </div>
+            {/if}
+
+            {#if showNewTopic}
+                <div class="flex gap-1">
+                    <input class="border rounded px-2 py-1 text-sm flex-1" placeholder="Topic name" bind:value={newTopicName} />
+                    <button type="button" onclick={handleCreateTopic} class="px-2 py-1 bg-green-500 text-white rounded text-xs">Create</button>
+                    <button type="button" onclick={() => showNewTopic = false} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Cancel</button>
+                </div>
+            {/if}
+
+            <div class="flex flex-wrap justify-center gap-2 pt-2 border-t border-gray-400">
+                <button type="button" onclick={() => showInviteInput = true} class="px-4 py-1.5 bg-blue-300 hover:bg-blue-400 rounded-lg text-sm transition-colors">Invite</button>
+                <button type="button" onclick={() => showNewTopic = true} class="px-4 py-1.5 bg-green-300 hover:bg-green-400 rounded-lg text-sm transition-colors">New Topic</button>
+                <button type="button" onclick={handleCreateInvitation} class="px-4 py-1.5 bg-purple-300 hover:bg-purple-400 rounded-lg text-sm transition-colors">Get Invite Link</button>
+                <button type="button" onclick={handleMute} class="px-4 py-1.5 bg-yellow-300 hover:bg-yellow-400 rounded-lg text-sm transition-colors">
+                    {isMuted() ? 'Unmute' : 'Mute'}
+                </button>
+                <button type="button" onclick={handleLeave} class="px-4 py-1.5 bg-red-300 hover:bg-red-400 rounded-lg text-sm transition-colors">Leave</button>
                 <button type="button" onclick={close} class="px-4 py-1.5 bg-gray-300 hover:bg-gray-400 rounded-lg text-sm transition-colors">Close</button>
             </div>
         {:else if topicData}

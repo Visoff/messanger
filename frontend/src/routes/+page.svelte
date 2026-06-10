@@ -5,8 +5,12 @@
     import { getMe } from "$lib/api/auth";
     import ChatCreationModel from "$lib/components/ChatCreationModel.svelte";
     import ChatPage from "$lib/components/ChatPage.svelte";
+    import AccountMenu from "$lib/components/AccountMenu.svelte";
+    import Toast from "$lib/components/Toast.svelte";
     import { extractFromSearchParams } from "$lib/index";
     import { user } from "$lib/stores/user";
+
+    let toast: Toast;
 
     async function getServiceWorkerRegistration() {
         if (navigator.serviceWorker.controller) {
@@ -47,6 +51,7 @@
     }
 
     let chat_id: string | undefined = $state(extractFromSearchParams("chat_id"));
+    let chatListRefreshKey = $state(0);
 
     onMount(() => {
         const token = localStorage.getItem("token");
@@ -69,8 +74,21 @@
         };
 
         window.addEventListener("click", prompt_notifications);
+
+        if (token) {
+            const stream = new EventSource(`${API_URL}/pubsub/sse?token=${token}`);
+            stream.addEventListener("message", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === "chat_created" || data.type === "user_added_to_chat") {
+                        chatListRefreshKey++;
+                    }
+                } catch {}
+            });
+        }
     });
 
+    let accountMenu: AccountMenu;
     let chatPageRef: ChatPage | undefined = $state();
 
     function clearChat() {
@@ -81,15 +99,31 @@
         url.searchParams.delete("topic_id");
         history.pushState(null, "", url);
     }
+
+    function getInitials(name: string | undefined): string {
+        if (!name) return "?";
+        return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    }
 </script>
+
+<Toast bind:this={toast} />
 
 <main class="flex h-screen bg-white">
     <div class="md:w-80 md:relative min-w-80 border-r-gray-100 border-r flex flex-col bg-white w-full absolute">
         <div class="flex justify-between items-center p-4 border-b-gray-100 border-b">
-            <span class="font-bold text-lg">Messanger</span>
+            <div class="flex items-center gap-2">
+                <button onclick={() => accountMenu?.open()} class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-xs overflow-hidden hover:opacity-80 transition-opacity" title="Account">
+                    {#if $user?.avatar_url}
+                        <img src={$user.avatar_url} alt="avatar" class="w-full h-full object-cover" />
+                    {:else}
+                        {getInitials($user?.username)}
+                    {/if}
+                </button>
+                <span class="font-bold text-lg">Messanger</span>
+            </div>
             <ChatCreationModel />
         </div>
-        <ChatList onselect={(id) => {chat_id = id; chatPageRef?.resetTopic();}} current_chat_id={chat_id} />
+        <ChatList onselect={(id) => {chat_id = id; chatPageRef?.resetTopic();}} current_chat_id={chat_id} refreshKey={chatListRefreshKey} />
     </div>
 
     {#if chat_id}
@@ -112,3 +146,5 @@
         </div>
     {/if}
 </main>
+
+<AccountMenu bind:this={accountMenu} />

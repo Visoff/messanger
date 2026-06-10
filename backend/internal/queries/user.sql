@@ -11,3 +11,11 @@ SELECT * FROM users WHERE username = $1;
 
 -- name: GetUserById :one
 SELECT * FROM users WHERE id = $1;
+
+-- name: UpdateUser :one
+UPDATE users SET
+    username = $2,
+    avatar_url = $3,
+    metadata = $4,
+    updated_at = NOW()
+WHERE id = $1 RETURNING *;

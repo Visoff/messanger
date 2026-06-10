@@ -2,27 +2,61 @@
     import Dialog from "./Dialog.svelte";
     import { createChat, createPrivateChat } from "$lib/api/chats";
     import { resolveUsername } from "$lib/api/users";
+    import type { User } from "$lib/types";
 
     let dialog: Dialog;
-
+    let userPopup: Dialog;
     let dialog_mode: "group" | "private" | "channel" = "group";
+    let foundUser: User | null = $state(null);
+    let searchError: string = $state("");
+    let creating = $state(false);
 
     function submitform(e: SubmitEvent) {
         e.preventDefault();
         if (dialog_mode == "group") {
-            const title = e.target["title"].value;
+            creating = true;
+            const title = (e.target as HTMLFormElement)["title"].value;
             createChat(title).then(() => {
                 location.reload();
             });
         } else if (dialog_mode == "private") {
-            const username = e.target["username"].value;
+            const username = (e.target as HTMLFormElement)["username"].value;
+            searchError = "";
+            foundUser = null;
             resolveUsername(username).then((user) => {
-                if ("error" in user) return;
-                createPrivateChat(user.id).then(() => {
-                    location.reload();
-                });
+                if ("error" in user) {
+                    searchError = user.error ?? "User not found";
+                    return;
+                }
+                foundUser = user;
+                userPopup.open();
             });
         }
+    }
+
+    async function startChat() {
+        if (!foundUser) return;
+        creating = true;
+        const resp = await createPrivateChat(foundUser.id);
+        if ("error" in resp) {
+            searchError = resp.error ?? "Failed to create chat";
+            creating = false;
+            return;
+        }
+        userPopup.close();
+        dialog.close();
+        location.reload();
+    }
+
+    function startCall() {
+        if (!foundUser) return;
+        const url = new URL(`${window.location.origin}/conference`);
+        window.open(url.toString(), "_blank", "width=960,height=640");
+        userPopup.close();
+    }
+
+    function getInitials(name: string): string {
+        return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     }
 </script>
 
@@ -40,7 +74,7 @@
             <select
                 class="bold text-2xl"
                 oninput={(e) => {
-                    dialog_mode = e.target.value;
+                    dialog_mode = (e.target as HTMLSelectElement).value as "group" | "private" | "channel";
                 }}
                 value={dialog_mode}
             >
@@ -57,8 +91,36 @@
             {#if dialog_mode === "channel"}
                 <input type="text" placeholder="Channel name" />
             {/if}
-            <button type="submit">Create</button>
+            <button type="submit">{creating ? 'Creating...' : 'Search'}</button>
         </form>
+    </Dialog>
+
+    <Dialog bind:this={userPopup}>
+        {#if foundUser}
+            <div class="bg-gray-200 border border-gray-600 rounded-lg px-4 py-2 flex flex-col gap-2 min-w-64">
+                <div class="flex flex-col items-center gap-2 py-2">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-xl">
+                        {getInitials(foundUser.username)}
+                    </div>
+                    <h2 class="text-lg font-bold">@{foundUser.username}</h2>
+                    {#if foundUser.last_seen_at}
+                        <span class="text-xs text-gray-500">Last seen: {new Date(foundUser.last_seen_at).toLocaleDateString()}</span>
+                    {/if}
+                </div>
+
+                {#if searchError}
+                    <div class="text-red-500 text-xs text-center">{searchError}</div>
+                {/if}
+
+                <div class="flex justify-center gap-2 pt-2 border-t border-gray-400">
+                    <button onclick={startChat} disabled={creating} class="px-4 py-1.5 bg-blue-300 hover:bg-blue-400 rounded-lg text-sm transition-colors disabled:opacity-50">
+                        {creating ? '...' : 'Start Chat'}
+                    </button>
+                    <button onclick={startCall} class="px-4 py-1.5 bg-green-300 hover:bg-green-400 rounded-lg text-sm transition-colors">Call</button>
+                    <button onclick={() => userPopup.close()} class="px-4 py-1.5 bg-gray-300 hover:bg-gray-400 rounded-lg text-sm transition-colors">Close</button>
+                </div>
+            </div>
+        {/if}
     </Dialog>
 </div>
 

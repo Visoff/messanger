@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/pkgs/httperrors"
@@ -23,6 +24,21 @@ func (s *ChatService) ListChats(ctx context.Context) ([]*repository.Chat, error)
 	if err != nil {
 		return []*repository.Chat{}, nil
 	}
+
+	for _, chat := range list {
+		if chat.Type == repository.ChatTypePrivate && chat.Title == "" {
+			members, err := s.repository.ListChatMembers(ctx, chat.ID)
+			if err == nil {
+				for _, member := range members {
+					if member.ID != user_id {
+						chat.Title = member.Username
+						break
+					}
+				}
+			}
+		}
+	}
+
 	return list, nil
 }
 
@@ -80,7 +96,26 @@ func (s *ChatService) ListMessages(ctx context.Context, chat_id uuid.UUID) ([]*r
 }
 
 func (s *ChatService) GetChat(ctx context.Context, chat_id uuid.UUID) (*repository.Chat, error) {
-	return s.repository.GetChat(ctx, chat_id)
+	chat, err := s.repository.GetChat(ctx, chat_id)
+	if err != nil {
+		return nil, err
+	}
+	if chat.Type == repository.ChatTypePrivate && chat.Title == "" {
+		user_id, err := ExtractUserId(ctx)
+		if err != nil {
+			return chat, nil
+		}
+		members, err := s.repository.ListChatMembers(ctx, chat.ID)
+		if err == nil {
+			for _, member := range members {
+				if member.ID != user_id {
+					chat.Title = member.Username
+					break
+				}
+			}
+		}
+	}
+	return chat, nil
 }
 
 type CreateTopicDTO struct {
@@ -149,6 +184,15 @@ func (s *ChatService) InviteUser(ctx context.Context, chat_id uuid.UUID, user_id
 func (s *ChatService) CreateInvitation(ctx context.Context, chat_id uuid.UUID) (*uuid.UUID, error) {
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return nil, err}
+
+	existing, err := s.repository.GetInvitationByUserAndChat(ctx, &repository.GetInvitationByUserAndChatParams{
+		UserID: user_id,
+		ChatID: chat_id,
+	})
+	if err == nil && existing != nil {
+		return &existing.ID, nil
+	}
+
 	id, err := s.repository.CreateChatInvitation(ctx, &repository.CreateChatInvitationParams{
 		ChatID: chat_id,
 		UserID: user_id,
@@ -157,11 +201,44 @@ func (s *ChatService) CreateInvitation(ctx context.Context, chat_id uuid.UUID) (
 	return &id, nil
 }
 
+func (s *ChatService) GetInvitation(ctx context.Context, id uuid.UUID) (*repository.Invitation, error) {
+	return s.repository.GetInvitationById(ctx, id)
+}
+
+func (s *ChatService) AcceptInvitation(ctx context.Context, invitation_id uuid.UUID) (*repository.Chat, error) {
+	invitation, err := s.repository.GetInvitationById(ctx, invitation_id)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("Invitation not found")
+	}
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = s.repository.AddUserToChat(ctx, &repository.AddUserToChatParams{
+		ChatID: invitation.ChatID,
+		UserID: user_id,
+		Role:   repository.ChatRoleMember,
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.repository.UseInvitation(ctx, invitation_id)
+	return s.repository.GetChat(ctx, invitation.ChatID)
+}
+
 func (s *ChatService) ListChatMembers(ctx context.Context, chat_id uuid.UUID) ([]*repository.User, error) {
 	return s.repository.ListChatMembers(ctx, chat_id)
 }
 
 func (s *ChatService) CreatePrivateChat(ctx context.Context, user1_id, user2_id uuid.UUID) (*repository.Chat, error) {
+	existing, err := s.repository.CheckPrivateChatExists(ctx, user1_id, user2_id)
+	if err == nil && existing != nil {
+		chat, err := s.repository.GetChat(ctx, *existing)
+		if err == nil {
+			return chat, httperrors.NewHTTPConflictError("Private chat already exists")
+		}
+	}
+
 	chat, err := s.repository.CreateChat(ctx, &repository.CreateChatParams{
 		Title: "",
 		Type: repository.ChatTypePrivate,
@@ -186,4 +263,45 @@ func (s *ChatService) CreatePrivateChat(ctx context.Context, user1_id, user2_id 
 		return nil, err
 	}
 	return chat, nil
+}
+
+type UpdateChatDTO struct {
+	Title    string          `json:"title"`
+	Metadata json.RawMessage `json:"metadata"`
+}
+
+func (dto *UpdateChatDTO) Validate() error {
+	return nil
+}
+
+func (s *ChatService) UpdateChat(ctx context.Context, chat_id uuid.UUID, dto *UpdateChatDTO) (*repository.Chat, error) {
+	metadata := []byte("{}")
+	if dto.Metadata != nil {
+		metadata = dto.Metadata
+	}
+	return s.repository.UpdateChat(ctx, &repository.UpdateChatParams{
+		ID:       chat_id,
+		Title:    dto.Title,
+		Metadata: metadata,
+	})
+}
+
+func (s *ChatService) LeaveChat(ctx context.Context, chat_id uuid.UUID) error {
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {
+		return err
+	}
+	return s.repository.RemoveUserFromChat(ctx, &repository.RemoveUserFromChatParams{
+		UserID: user_id,
+		ChatID: chat_id,
+	})
+}
+
+func (s *ChatService) MuteChat(ctx context.Context, chat_id uuid.UUID, muted bool) (*repository.Chat, error) {
+	metadata := map[string]interface{}{"muted": muted}
+	metaBytes, _ := json.Marshal(metadata)
+	return s.repository.UpdateChatMuted(ctx, &repository.UpdateChatMutedParams{
+		ID:       chat_id,
+		Metadata: metaBytes,
+	})
 }

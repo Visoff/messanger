@@ -1,19 +1,23 @@
 <script lang="ts">
     import { fetchChats } from "$lib/api/chats";
     import type { Chat } from "$lib/types";
-    import { onMount } from "svelte";
 
-    const { onselect, current_chat_id }: { onselect: (id: string) => void, current_chat_id?: string } = $props();
+    const { onselect, current_chat_id, refreshKey }: { onselect: (id: string) => void, current_chat_id?: string, refreshKey?: number } = $props();
 
     let chats: Chat[] = $state([]);
 
-    onMount(async () => {
+    async function loadChats() {
         const resp = await fetchChats();
         if ("error" in resp) {
             console.error(resp.error);
             return
         }
         chats = resp;
+    }
+
+    $effect(() => {
+        refreshKey;
+        loadChats();
     });
 
     function selectChatEvent(chat_id: string) {

@@ -35,3 +35,17 @@ export async function getMe(): Promise<User | ErrorResponse> {
     const data = await response.json();
     return data;
 }
+
+export async function updateUser(data: { username?: string, avatar_url?: string | null }): Promise<User | ErrorResponse> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/users/me`, {
+        method: 'PUT',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    return result;
+}

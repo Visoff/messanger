@@ -40,6 +40,10 @@ func (s *AuthService) GenerateToken(user_id string) string {
 	return tokenString
 }
 
+func (s *AuthService) ValidateToken(token string) (string, error) {
+	return s.GetUserId(token)
+}
+
 func (s *AuthService) GetUserId(token string) (string, error) {
 	t, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
