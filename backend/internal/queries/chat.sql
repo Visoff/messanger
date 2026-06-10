@@ -63,6 +63,9 @@ WHERE messages.chat_id = ANY($1::uuid[])
   AND messages.deleted_at IS NULL
 ORDER BY messages.chat_id, messages.created_at DESC;
 
+-- name: UpdateChatUpdatedAt :exec
+UPDATE chats SET updated_at = NOW() WHERE id = $1;
+
 -- name: UpdateChatMuted :one
 UPDATE chats SET
     metadata = $2,

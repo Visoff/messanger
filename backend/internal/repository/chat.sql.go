@@ -304,3 +304,12 @@ func (q *Queries) UpdateChatMuted(ctx context.Context, arg *UpdateChatMutedParam
 	)
 	return &i, err
 }
+
+const updateChatUpdatedAt = `-- name: UpdateChatUpdatedAt :exec
+UPDATE chats SET updated_at = NOW() WHERE id = $1
+`
+
+func (q *Queries) UpdateChatUpdatedAt(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, updateChatUpdatedAt, id)
+	return err
+}

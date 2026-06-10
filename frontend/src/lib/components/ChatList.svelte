@@ -13,6 +13,12 @@
     newMessageEvent.subscribe(msg => {
         if (!msg) return;
         fallbackMessages[msg.chat_id] = msg;
+        const idx = loadedChats.findIndex(c => c.id === msg.chat_id);
+        if (idx !== -1) {
+            loadedChats[idx].last_message = msg;
+            const chat = loadedChats.splice(idx, 1)[0];
+            loadedChats = [chat, ...loadedChats];
+        }
     });
 
     async function loadChats() {
