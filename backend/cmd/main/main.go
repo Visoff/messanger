@@ -79,6 +79,7 @@ func main() {
 	user_service := services.NewUserService(repo, auth_service)
 	chat_service := services.NewChatService(repo)
 	topic_service := services.NewTopicService(repo)
+	category_service := services.NewCategoryService(repo)
 	pubsub_service, err := services.NewPubSubService()
 	webpush_service := services.NewWebPushService(repo, pubsub_service)
 	if err != nil {
@@ -91,6 +92,7 @@ func main() {
 	topic_controller := controllers.NewTopicController(topic_service, user_service, webpush_service, auth_service)
 	pubsub_controller := controllers.NewPubSubController(pubsub_service, webpush_service, auth_service)
 	invitation_controller := controllers.NewInvitationController(chat_service, auth_service)
+	category_controller := controllers.NewCategoryController(category_service, auth_service)
 
 	mux := http.NewServeMux()
 
@@ -99,6 +101,7 @@ func main() {
 	mux.Handle("/topics/", http.StripPrefix("/topics", topic_controller))
 	mux.Handle("/pubsub/", http.StripPrefix("/pubsub", pubsub_controller))
 	mux.Handle("/invitation/", http.StripPrefix("/invitation", invitation_controller))
+	mux.Handle("/categories/", http.StripPrefix("/categories", category_controller))
 
 	mux.Handle("/docs/swagger.json", http.StripPrefix("/docs", http.FileServerFS(docs.Docs)))
 	mux.Handle("/docs/", httpswagger.Handler(

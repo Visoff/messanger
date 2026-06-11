@@ -1,6 +1,9 @@
 <script lang="ts">
     import { API_URL } from "$lib/api/env";
     import ChatList from "$lib/components/ChatList.svelte";
+    import CategoryFilter from "$lib/components/CategoryFilter.svelte";
+    import type { UserCategory } from "$lib/components/CategoryFilter.svelte";
+    import { updateCategory } from "$lib/api/categories";
     import { onMount } from "svelte";
     import { getMe } from "$lib/api/auth";
     import ChatCreationModel from "$lib/components/ChatCreationModel.svelte";
@@ -9,6 +12,7 @@
     import Toast from "$lib/components/Toast.svelte";
     import { extractFromSearchParams } from "$lib/index";
     import { user } from "$lib/stores/user";
+    import { newMessageEvent } from "$lib/stores/messages";
 
     let toast: Toast;
 
@@ -52,6 +56,8 @@
 
     let chat_id: string | undefined = $state(extractFromSearchParams("chat_id"));
     let chatListRefreshKey = $state(0);
+    let activeCategory: { mode: string; category?: UserCategory } | null = $state(null);
+    let loadedChats: import("$lib/types").ChatWithLastMessage[] = $state([]);
 
     onMount(() => {
         const token = localStorage.getItem("token");
@@ -82,6 +88,8 @@
                     const data = JSON.parse(e.data);
                     if (data.type === "chat_created" || data.type === "user_added_to_chat") {
                         chatListRefreshKey++;
+                    } else if (data.chat_id) {
+                        newMessageEvent.set(data);
                     }
                 } catch {}
             });
@@ -98,6 +106,32 @@
         url.searchParams.delete("chat_id");
         url.searchParams.delete("topic_id");
         history.pushState(null, "", url);
+    }
+
+    function handleCategorySelect(mode: string, category?: UserCategory) {
+        if (!mode) {
+            activeCategory = null;
+        } else if (mode === "category" && category) {
+            activeCategory = { mode, category };
+        } else {
+            activeCategory = { mode };
+        }
+    }
+
+    async function handleAddChatToCategory(categoryId: string, chatTitle: string) {
+        const chat = loadedChats.find(c => c.title.toLowerCase() === chatTitle.toLowerCase());
+        if (!chat) return;
+        const cat = activeCategory?.category;
+        if (!cat) return;
+        const chatIds = [...(cat.chat_ids || [])];
+        if (chatIds.includes(chat.id)) return;
+        chatIds.push(chat.id);
+        const resp = await updateCategory(categoryId, cat.name, chatIds);
+        if ("error" in resp) {
+            console.error(resp.error);
+            return;
+        }
+        activeCategory = { mode: "category", category: resp };
     }
 
     function getInitials(name: string | undefined): string {
@@ -121,9 +155,28 @@
                 </button>
                 <span class="font-bold text-lg">Messanger</span>
             </div>
-            <ChatCreationModel />
+            <ChatCreationModel onchatstarted={(id) => {
+                chat_id = id;
+                chatListRefreshKey++;
+                const url = new URL(location.href);
+                url.searchParams.set("chat_id", id);
+                url.searchParams.delete("topic_id");
+                history.pushState(null, "", url);
+            }} />
         </div>
-        <ChatList onselect={(id) => {chat_id = id; chatPageRef?.resetTopic();}} current_chat_id={chat_id} refreshKey={chatListRefreshKey} />
+        <CategoryFilter
+            activeCategory={activeCategory}
+            oncategorieselect={handleCategorySelect}
+            onaddchat={handleAddChatToCategory}
+        />
+        <ChatList
+            onselect={(id) => {chat_id = id; chatPageRef?.resetTopic();}}
+            current_chat_id={chat_id}
+            refreshKey={chatListRefreshKey}
+            filterMode={activeCategory?.mode}
+            categoryChatIds={activeCategory?.category?.chat_ids}
+            onchatsload={(chats) => { loadedChats = chats; }}
+        />
     </div>
 
     {#if chat_id}

@@ -219,6 +219,43 @@ func (q *Queries) ListChats(ctx context.Context, userID uuid.UUID) ([]*Chat, err
 	return items, nil
 }
 
+const listChatsLastMessages = `-- name: ListChatsLastMessages :many
+SELECT DISTINCT ON (messages.chat_id) id, chat_id, topic_id, sender_id, reply_message_id, content, created_at, updated_at, deleted_at FROM messages
+WHERE messages.chat_id = ANY($1::uuid[])
+  AND messages.deleted_at IS NULL
+ORDER BY messages.chat_id, messages.created_at DESC
+`
+
+func (q *Queries) ListChatsLastMessages(ctx context.Context, dollar_1 []uuid.UUID) ([]*Message, error) {
+	rows, err := q.db.Query(ctx, listChatsLastMessages, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Message
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChatID,
+			&i.TopicID,
+			&i.SenderID,
+			&i.ReplyMessageID,
+			&i.Content,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserChats = `-- name: ListUserChats :many
 SELECT c.id, c.title, c.type, c.avatar_url, c.metadata, c.created_at, c.updated_at, c.deleted_at FROM chats c
 JOIN chat_members cm ON cm.chat_id = c.id
@@ -354,4 +391,13 @@ func (q *Queries) UpdateChatMuted(ctx context.Context, arg *UpdateChatMutedParam
 		&i.DeletedAt,
 	)
 	return &i, err
+}
+
+const updateChatUpdatedAt = `-- name: UpdateChatUpdatedAt :exec
+UPDATE chats SET updated_at = NOW() WHERE id = $1
+`
+
+func (q *Queries) UpdateChatUpdatedAt(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, updateChatUpdatedAt, id)
+	return err
 }

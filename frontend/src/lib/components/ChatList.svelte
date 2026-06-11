@@ -1,10 +1,25 @@
 <script lang="ts">
     import { fetchChats } from "$lib/api/chats";
-    import type { ChatWithLastMessage } from "$lib/types";
+    import { fetchMessages } from "$lib/api/messages";
+    import { newMessageEvent } from "$lib/stores/messages";
+    import type { ChatWithLastMessage, Message } from "$lib/types";
 
-    const { onselect, current_chat_id, refreshKey }: { onselect: (id: string) => void, current_chat_id?: string, refreshKey?: number } = $props();
+    const { onselect, current_chat_id, refreshKey, filterMode, categoryChatIds, onchatsload }: { onselect: (id: string) => void, current_chat_id?: string, refreshKey?: number, filterMode?: string, categoryChatIds?: string[], onchatsload?: (chats: ChatWithLastMessage[]) => void } = $props();
 
     let chats: ChatWithLastMessage[] = $state([]);
+    let loadedChats: ChatWithLastMessage[] = $state([]);
+    let fallbackMessages: Record<string, Message> = $state({});
+
+    newMessageEvent.subscribe(msg => {
+        if (!msg) return;
+        fallbackMessages[msg.chat_id] = msg;
+        const idx = loadedChats.findIndex(c => c.id === msg.chat_id);
+        if (idx !== -1) {
+            loadedChats[idx].last_message = msg;
+            const chat = loadedChats.splice(idx, 1)[0];
+            loadedChats = [chat, ...loadedChats];
+        }
+    });
 
     async function loadChats() {
         const resp = await fetchChats();
@@ -12,12 +27,49 @@
             console.error(resp.error);
             return
         }
-        chats = resp;
+        loadedChats = resp;
+        onchatsload?.(resp);
+
+        for (const chat of resp) {
+            if (chat.last_message) continue;
+            fetchMessages(chat.id).then(msgs => {
+                if (Array.isArray(msgs) && msgs.length > 0) {
+                    const lastMsg = msgs[msgs.length - 1];
+                    if (lastMsg.content) {
+                        fallbackMessages[chat.id] = lastMsg;
+                    }
+                }
+            });
+        }
+    }
+
+    function lastMsgFor(chat: ChatWithLastMessage): Message | null {
+        if (chat.last_message) return chat.last_message;
+        if (fallbackMessages[chat.id]) return fallbackMessages[chat.id];
+        return null;
     }
 
     $effect(() => {
         refreshKey;
         loadChats();
+    });
+
+    $effect(() => {
+        if (!loadedChats.length) {
+            chats = [];
+            return;
+        }
+        if (!filterMode) {
+            chats = loadedChats;
+        } else if (filterMode === "all") {
+            chats = loadedChats.filter(c => c.type === "group" || c.type === "channel");
+        } else if (filterMode === "personal") {
+            chats = loadedChats.filter(c => c.type === "private");
+        } else if (filterMode === "category" && categoryChatIds) {
+            chats = loadedChats.filter(c => categoryChatIds.includes(c.id));
+        } else {
+            chats = loadedChats;
+        }
     });
 
     function selectChatEvent(chat_id: string) {
@@ -47,13 +99,15 @@
     }
 
     function previewText(msg: { content?: string } | null): string {
-        if (!msg?.content) return "No messages yet";
+        if (!msg) return "No messages yet";
+        if (!msg.content) return "Message";
         return msg.content.length > 100 ? msg.content.slice(0, 100) + "…" : msg.content;
     }
 </script>
 
 <div class="chat-list">
     {#each chats as chat (chat.id)}
+        {@const msg = lastMsgFor(chat)}
         <button
             class="chat-item"
             class:selected={current_chat_id === chat.id}
@@ -69,11 +123,11 @@
             <div class="chat-info">
                 <div class="chat-header">
                     <span class="chat-title">{chat.title}</span>
-                    {#if chat.last_message}
-                        <span class="chat-time">{formatTime(chat.last_message.created_at)}</span>
+                    {#if msg}
+                        <span class="chat-time">{formatTime(msg.created_at)}</span>
                     {/if}
                 </div>
-                <div class="chat-preview">{previewText(chat.last_message)}</div>
+                <div class="chat-preview">{previewText(msg)}</div>
             </div>
         </button>
     {/each}

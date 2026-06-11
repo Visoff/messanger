@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"sort"
 
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/pkgs/httperrors"
@@ -30,6 +31,21 @@ func (s *ChatService) ListChats(ctx context.Context) ([]*ChatWithLastMessage, er
 		return []*ChatWithLastMessage{}, nil
 	}
 
+	chatIDs := make([]uuid.UUID, 0, len(chats))
+	for _, chat := range chats {
+		chatIDs = append(chatIDs, chat.ID)
+	}
+
+	lastMessages := make(map[uuid.UUID]*repository.Message)
+	if len(chatIDs) > 0 {
+		msgs, err := s.repository.ListChatsLastMessages(ctx, chatIDs)
+		if err == nil {
+			for _, msg := range msgs {
+				lastMessages[msg.ChatID] = msg
+			}
+		}
+	}
+
 	result := make([]*ChatWithLastMessage, 0, len(chats))
 	for _, chat := range chats {
 		if chat.Type == repository.ChatTypePrivate && chat.Title == "" {
@@ -53,6 +69,19 @@ func (s *ChatService) ListChats(ctx context.Context) ([]*ChatWithLastMessage, er
 
 		result = append(result, item)
 	}
+
+	sort.SliceStable(result, func(i, j int) bool {
+		if result[i].LastMessage != nil && result[j].LastMessage != nil {
+			return result[i].LastMessage.CreatedAt.After(result[j].LastMessage.CreatedAt)
+		}
+		if result[i].LastMessage != nil {
+			return true
+		}
+		if result[j].LastMessage != nil {
+			return false
+		}
+		return result[i].CreatedAt.After(result[j].CreatedAt)
+	})
 
 	return result, nil
 }
@@ -183,12 +212,17 @@ func (dto *CreateMessageDTO) Validate() error {
 func (s *ChatService) CreateMessage(ctx context.Context, chat_id uuid.UUID, dto *CreateMessageDTO) (*repository.Message, error) {
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return nil, err}
-	return s.repository.CreateChatMessage(ctx, &repository.CreateChatMessageParams{
+	msg, err := s.repository.CreateChatMessage(ctx, &repository.CreateChatMessageParams{
 		ChatID:         chat_id,
 		SenderID:       user_id,
 		Content:        &dto.Content,
 		ReplyMessageID: dto.ReplyMessageID,
 	})
+	if err != nil {
+		return nil, err
+	}
+	s.repository.UpdateChatUpdatedAt(ctx, chat_id)
+	return msg, nil
 }
 
 func (s *ChatService) InviteUser(ctx context.Context, chat_id uuid.UUID, user_id uuid.UUID) error {
