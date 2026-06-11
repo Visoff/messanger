@@ -17,7 +17,11 @@ export async function fetchCategories(): Promise<UserCategoryResponse[] | ErrorR
             Authorization: `Bearer ${token}`,
         },
     });
-    const data = await response.json() || [];
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Failed to fetch categories" }));
+        return err;
+    }
+    const data = await response.json();
     return data;
 }
 

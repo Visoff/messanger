@@ -3,7 +3,7 @@
     import ChatList from "$lib/components/ChatList.svelte";
     import CategoryFilter from "$lib/components/CategoryFilter.svelte";
     import type { UserCategory } from "$lib/components/CategoryFilter.svelte";
-    import { updateCategory } from "$lib/api/categories";
+    import { fetchCategories, updateCategory } from "$lib/api/categories";
     import { onMount } from "svelte";
     import { getMe } from "$lib/api/auth";
     import ChatCreationModel from "$lib/components/ChatCreationModel.svelte";
@@ -58,6 +58,7 @@
     let chatListRefreshKey = $state(0);
     let activeCategory: { mode: string; category?: UserCategory } | null = $state(null);
     let loadedChats: import("$lib/types").ChatWithLastMessage[] = $state([]);
+    const initialCategoryParam = extractFromSearchParams("category");
 
     onMount(() => {
         const token = localStorage.getItem("token");
@@ -65,12 +66,26 @@
             window.location.href = "/login";
         } else {
             console.log(token);
-            getMe().then((resp) => {
+            getMe().then(async (resp) => {
                 if ("error" in resp) {
                     console.error(resp.error);
                     return
                 }
-                user.set(resp)
+                user.set(resp);
+
+                if (initialCategoryParam) {
+                    if (initialCategoryParam === "personal" || initialCategoryParam === "groups") {
+                        activeCategory = { mode: initialCategoryParam };
+                    } else if (initialCategoryParam !== "all") {
+                        const cats = await fetchCategories();
+                        if (!("error" in cats)) {
+                            const cat = cats.find(c => c.id === initialCategoryParam);
+                            if (cat) {
+                                activeCategory = { mode: "category", category: cat };
+                            }
+                        }
+                    }
+                }
             });
         }
 
@@ -116,6 +131,16 @@
         } else {
             activeCategory = { mode };
         }
+
+        const url = new URL(location.href);
+        if (!mode) {
+            url.searchParams.delete("category");
+        } else if (mode === "category" && category) {
+            url.searchParams.set("category", category.id);
+        } else {
+            url.searchParams.set("category", mode);
+        }
+        history.replaceState(null, "", url);
     }
 
     async function handleAddChatToCategory(categoryId: string, chatTitle: string) {

@@ -47,7 +47,9 @@
         if (!id || id === prevUserId) return;
         prevUserId = id;
         loadCategories();
-        oncategorieselect("all");
+        if (!activeCategory) {
+            oncategorieselect("all");
+        }
     });
 
     function toggleDropdown() {
@@ -116,6 +118,7 @@
         if (!activeCategory) return "Category";
         if (activeCategory.mode === "all") return "All Chats";
         if (activeCategory.mode === "personal") return "Personal";
+        if (activeCategory.mode === "groups") return "Groups";
         if (activeCategory.mode === "category" && activeCategory.category) return activeCategory.category.name;
         return "Category";
     }
@@ -133,6 +136,7 @@
         <div class="dropdown" onclick={(e) => e.stopPropagation()}>
             <button class="dropdown-item" onclick={selectAllChats}>All Chats</button>
             <button class="dropdown-item" onclick={selectPersonal}>Personal</button>
+            <button class="dropdown-item" onclick={() => oncategorieselect("groups")}>Groups</button>
 
             {#each categories as cat (cat.id)}
                 <button class="dropdown-item" onclick={() => selectCategory(cat)}>

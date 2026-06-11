@@ -59,12 +59,12 @@
             chats = [];
             return;
         }
-        if (!filterMode) {
+        if (!filterMode || filterMode === "all") {
             chats = loadedChats;
-        } else if (filterMode === "all") {
-            chats = loadedChats.filter(c => c.type === "group" || c.type === "channel");
         } else if (filterMode === "personal") {
             chats = loadedChats.filter(c => c.type === "private");
+        } else if (filterMode === "groups") {
+            chats = loadedChats.filter(c => c.type === "group" || c.type === "channel");
         } else if (filterMode === "category" && categoryChatIds) {
             chats = loadedChats.filter(c => categoryChatIds.includes(c.id));
         } else {
