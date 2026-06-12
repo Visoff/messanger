@@ -1,19 +1,20 @@
 <script lang="ts">
     import Dialog from "./Dialog.svelte";
     import PrivateChatInfo from "./PrivateChatInfo.svelte";
-    import { fetchChat, fetchChatMembers, InviteUserToChat, updateChat, leaveChat, muteChat, createInvitation, uploadChatAvatar } from "$lib/api/chats";
+    import { fetchChat, fetchChatMembers, fetchMyRole, InviteUserToChat, updateChat, leaveChat, muteChat, createInvitation, uploadChatAvatar } from "$lib/api/chats";
     import { fetchTopic, createTopic } from "$lib/api/topics";
     import { resolveUsername } from "$lib/api/users";
     import type { Chat, Topic, TopicType, User } from "$lib/types";
-    import { API_URL } from "$lib/api/env";
     import { user } from "$lib/stores/user";
 
     let {
         chat_id,
-        topic_id
+        topic_id,
+        onleave
     }: {
         chat_id: string,
-        topic_id?: string
+        topic_id?: string,
+        onleave?: () => void
     } = $props();
 
     let dialog: Dialog;
@@ -33,6 +34,9 @@
     let invitationLink = $state("");
     let uploadingAvatar = $state(false);
     let avatarFileInput: HTMLInputElement;
+    let userRole: string | null = $state(null);
+
+    let isAdmin = $derived(userRole === "owner" || userRole === "admin");
 
     let otherUser = $derived(
         chatData?.type === "private"
@@ -60,12 +64,14 @@
         showNewTopic = false;
         newTopicType = null;
         editingTitle = false;
+        userRole = null;
 
         try {
             if (!topic_id) {
-                const [chatResp, membersResp] = await Promise.all([
+                const [chatResp, membersResp, roleResp] = await Promise.all([
                     fetchChat(chat_id),
-                    fetchChatMembers(chat_id)
+                    fetchChatMembers(chat_id),
+                    fetchMyRole(chat_id)
                 ]);
                 if ("error" in chatResp) {
                     error = chatResp.error;
@@ -76,6 +82,9 @@
                     members = membersResp;
                 } else {
                     console.error(membersResp.error);
+                }
+                if (!("error" in roleResp)) {
+                    userRole = roleResp.role;
                 }
             } else {
                 const resp = await fetchTopic(topic_id);
@@ -170,7 +179,7 @@
             error = resp.error ?? "Failed to leave chat";
         } else {
             close();
-            window.location.reload();
+            onleave?.();
         }
     }
 
@@ -179,7 +188,8 @@
         if ("error" in resp) {
             error = resp.error ?? "Failed to create invitation";
         } else {
-            invitationLink = `${API_URL}/invitation/${resp.id}`;
+            const base = window.location.origin;
+            invitationLink = `${base}/invitation?invite_id=${resp.id}`;
         }
     }
 
@@ -240,26 +250,38 @@
                 <PrivateChatInfo {otherUser} />
             {:else}
                 <div class="flex items-center gap-3">
-                    <button onclick={() => avatarFileInput?.click()} class="relative w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-base overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity group" title="Change chat avatar">
-                        {#if chatData.avatar_url}
-                            <img src={chatData.avatar_url} alt="avatar" class="w-full h-full object-cover" />
-                        {:else}
-                            {getInitials(chatData.title)}
-                        {/if}
-                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M17 5h-1.5l-1-1h-5l-1 1H7v2h10V5zM7 7v10a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7z"/></svg>
+                    {#if isAdmin}
+                        <button onclick={() => avatarFileInput?.click()} class="relative w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-base overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity group" title="Change chat avatar">
+                            {#if chatData.avatar_url}
+                                <img src={chatData.avatar_url} alt="avatar" class="w-full h-full object-cover" />
+                            {:else}
+                                {getInitials(chatData.title)}
+                            {/if}
+                            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M17 5h-1.5l-1-1h-5l-1 1H7v2h10V5zM7 7v10a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7z"/></svg>
+                            </div>
+                        </button>
+                        <input bind:this={avatarFileInput} type="file" accept="image/*" class="hidden" onchange={handleChatAvatarUpload} />
+                    {:else}
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-base overflow-hidden flex-shrink-0">
+                            {#if chatData.avatar_url}
+                                <img src={chatData.avatar_url} alt="avatar" class="w-full h-full object-cover" />
+                            {:else}
+                                {getInitials(chatData.title)}
+                            {/if}
                         </div>
-                    </button>
-                    <input bind:this={avatarFileInput} type="file" accept="image/*" class="hidden" onchange={handleChatAvatarUpload} />
+                    {/if}
                     <div class="flex-1">
-                        {#if editingTitle}
+                        {#if isAdmin && editingTitle}
                             <div class="flex gap-1">
                                 <input class="border rounded px-2 py-1 text-sm flex-1" bind:value={editTitleValue} />
                                 <button type="button" onclick={handleRename} class="px-2 py-1 bg-blue-500 text-white rounded text-xs">Save</button>
                                 <button type="button" onclick={() => editingTitle = false} class="px-2 py-1 bg-gray-400 text-white rounded text-xs">Cancel</button>
                             </div>
-                        {:else}
+                        {:else if isAdmin}
                             <button type="button" onclick={() => { editTitleValue = chatData.title; editingTitle = true; }} class="text-xl font-bold hover:text-blue-600 transition-colors text-left">{chatData.title} ✎</button>
+                        {:else}
+                            <span class="text-xl font-bold">{chatData.title}</span>
                         {/if}
                         <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{typeLabel(chatData.type)}</span>
                     </div>
@@ -346,11 +368,13 @@
             {/if}
 
             <div class="flex flex-wrap justify-center gap-2 pt-2 border-t border-gray-400">
-                {#if chatData?.type !== "private"}
+                {#if isAdmin && chatData?.type !== "private"}
                     <button type="button" onclick={() => showInviteInput = true} class="px-4 py-1.5 bg-blue-300 hover:bg-blue-400 rounded-lg text-sm transition-colors">Invite</button>
                     <button type="button" onclick={handleCreateInvitation} class="px-4 py-1.5 bg-purple-300 hover:bg-purple-400 rounded-lg text-sm transition-colors">Get Invite Link</button>
                 {/if}
-                <button type="button" onclick={() => showNewTopic = true} class="px-4 py-1.5 bg-green-300 hover:bg-green-400 rounded-lg text-sm transition-colors">New Topic</button>
+                {#if isAdmin}
+                    <button type="button" onclick={() => showNewTopic = true} class="px-4 py-1.5 bg-green-300 hover:bg-green-400 rounded-lg text-sm transition-colors">New Topic</button>
+                {/if}
                 <button type="button" onclick={handleMute} class="px-4 py-1.5 bg-yellow-300 hover:bg-yellow-400 rounded-lg text-sm transition-colors">
                     {isMuted() ? 'Unmute' : 'Mute'}
                 </button>

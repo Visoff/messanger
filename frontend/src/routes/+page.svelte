@@ -11,6 +11,7 @@
     import AccountMenu from "$lib/components/AccountMenu.svelte";
     import Toast from "$lib/components/Toast.svelte";
     import { extractFromSearchParams } from "$lib/index";
+    import { goto } from "$app/navigation";
     import { user } from "$lib/stores/user";
     import { newMessageEvent } from "$lib/stores/messages";
 
@@ -60,10 +61,32 @@
     let loadedChats: import("$lib/types").ChatWithLastMessage[] = $state([]);
     const initialCategoryParam = extractFromSearchParams("category");
 
+    let isMobile = $state(false);
+    let showChatPanel = $state(false);
+
+    $effect(() => {
+        if (typeof window !== "undefined") {
+            const mql = window.matchMedia("(max-width: 767px)");
+            isMobile = mql.matches;
+            const handler = (e: MediaQueryListEvent) => { isMobile = e.matches; };
+            mql.addEventListener("change", handler);
+            return () => mql.removeEventListener("change", handler);
+        }
+    });
+
+    $effect(() => {
+        if (chat_id && isMobile) {
+            showChatPanel = true;
+        }
+        if (!chat_id) {
+            showChatPanel = false;
+        }
+    });
+
     onMount(() => {
         const token = localStorage.getItem("token");
         if (!token) {
-            window.location.href = "/login";
+            goto("/login");
         } else {
             console.log(token);
             getMe().then(async (resp) => {
@@ -74,7 +97,7 @@
                 user.set(resp);
 
                 if (initialCategoryParam) {
-                    if (initialCategoryParam === "personal" || initialCategoryParam === "groups") {
+                    if (initialCategoryParam === "personal" || initialCategoryParam === "groups" || initialCategoryParam === "channels") {
                         activeCategory = { mode: initialCategoryParam };
                     } else if (initialCategoryParam !== "all") {
                         const cats = await fetchCategories();
@@ -115,12 +138,28 @@
     let chatPageRef: ChatPage | undefined = $state();
 
     function clearChat() {
-        chat_id = undefined
+        chat_id = undefined;
+        showChatPanel = false;
         chatPageRef?.resetTopic();
         const url = new URL(location.href);
         url.searchParams.delete("chat_id");
         url.searchParams.delete("topic_id");
         history.pushState(null, "", url);
+    }
+
+    function handleMobileBack() {
+        if (isMobile && chat_id) {
+            showChatPanel = false;
+        } else {
+            clearChat();
+        }
+    }
+
+    function handleLeaveChat() {
+        if (chat_id) {
+            loadedChats = loadedChats.filter(c => c.id !== chat_id);
+        }
+        clearChat();
     }
 
     function handleCategorySelect(mode: string, category?: UserCategory) {
@@ -167,8 +206,8 @@
 
 <Toast bind:this={toast} />
 
-<main class="flex h-screen bg-white">
-    <div class="md:w-80 md:relative min-w-80 border-r-gray-100 border-r flex flex-col bg-white w-full absolute">
+<main class="flex h-screen bg-white overflow-hidden">
+    <div class="md:w-80 md:relative min-w-80 border-r-gray-100 border-r flex flex-col bg-white w-full absolute md:flex {isMobile && showChatPanel ? 'hidden' : ''}">
         <div class="flex justify-between items-center p-4 border-b-gray-100 border-b">
             <div class="flex items-center gap-2">
                 <button onclick={() => accountMenu?.open()} class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-xs overflow-hidden hover:opacity-80 transition-opacity" title="Account">
@@ -204,9 +243,11 @@
         />
     </div>
 
-    {#if chat_id}
-        <ChatPage chat_id={chat_id} onclose={clearChat} bind:this={chatPageRef} />
-    {:else}
+    {#if chat_id && (!isMobile || showChatPanel)}
+        <div class="w-full md:flex {isMobile ? 'absolute inset-0 z-20 bg-white flex flex-col animate-slide-in' : 'flex'}">
+            <ChatPage chat_id={chat_id} onclose={handleMobileBack} onleave={handleLeaveChat} bind:this={chatPageRef} />
+        </div>
+    {:else if !chat_id && !isMobile}
         <div class="w-full flex flex-col items-center justify-center bg-gray-50">
             <div class="mb-4 opacity-50">
                 <svg
@@ -226,3 +267,14 @@
 </main>
 
 <AccountMenu bind:this={accountMenu} />
+
+<style>
+    @keyframes slide-in {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+    }
+
+    .animate-slide-in {
+        animation: slide-in 0.2s ease-out;
+    }
+</style>

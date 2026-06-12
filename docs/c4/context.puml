@@ -1,0 +1,20 @@
+@startuml Контекст Мессенджера
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_LEFT_RIGHT()
+LAYOUT_WITH_LEGEND()
+
+title System context — Messanger
+
+Person(user, "User", "Живой человек, который хочет кому-то написать или позвонить")
+
+System(messenger, "Messanger", "Мессенджер: чаты, топики, звонки, каналы. Сборная солянка из Go, Svelte, Rust и Redis")
+
+System_Ext(pushService, "WebPush", "Спамит уведомлениями через браузерный ServiceWorker, даже когда юзер закрыл вкладку")
+
+Rel(user, messenger, "Пользуется", "HTTPS")
+Rel(messenger, pushService, "Шлёт пуши", "HTTP")
+Rel_R(user, pushService, "Ловит уведомления")
+
+SHOW_LEGEND()
+@enduml

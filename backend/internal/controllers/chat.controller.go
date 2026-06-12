@@ -42,6 +42,7 @@ func NewChatController(chatService *services.ChatService, userService *services.
 
 	mux.Handle("GET /", authService.ProtectRoute(handlers.Handler(c.ListChats)))
 	mux.Handle("POST /group", authService.ProtectRoute(handlers.Handler(c.CreateChat)))
+	mux.Handle("POST /channel", authService.ProtectRoute(handlers.Handler(c.CreateChannel)))
 	mux.Handle("POST /private", authService.ProtectRoute(handlers.Handler(c.CreatePrivateChat)))
 
 	mux.Handle("GET /{id}", authService.ProtectRoute(handlers.Handler(c.GetChat)))
@@ -64,6 +65,7 @@ func NewChatController(chatService *services.ChatService, userService *services.
 	mux.Handle("POST /{id}/leave", authService.ProtectRoute(handlers.Handler(c.LeaveChat)))
 	mux.Handle("PUT /{id}/mute", authService.ProtectRoute(handlers.Handler(c.MuteChat)))
 	mux.Handle("GET /{id}/members", authService.ProtectRoute(handlers.Handler(c.ListChatMembers)))
+	mux.Handle("GET /{id}/my-role", authService.ProtectRoute(handlers.Handler(c.GetMyRole)))
 
 	return c
 }
@@ -115,6 +117,28 @@ func (c *ChatController) CreateChat(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	chat, err := c.chatService.CreateChat(r.Context(), &dto)
+	if err != nil {
+		return err
+	}
+
+	go c.pubsubService.Publish(context.Background(), chat.ID.String(), map[string]interface{}{
+		"type": "chat_created",
+		"chat": chat,
+	})
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(chat)
+	return nil
+}
+
+func (c *ChatController) CreateChannel(w http.ResponseWriter, r *http.Request) error {
+	var dto services.CreateChatDTO
+
+	if err := dtos.ParseFromBody(r, &dto); err != nil {
+		return err
+	}
+
+	chat, err := c.chatService.CreateChannel(r.Context(), &dto)
 	if err != nil {
 		return err
 	}
@@ -480,5 +504,19 @@ func (c *ChatController) ListChatMembers(w http.ResponseWriter, r *http.Request)
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(members)
+	return nil
+}
+
+func (c *ChatController) GetMyRole(w http.ResponseWriter, r *http.Request) error {
+	chat_id, err := handlers.GetParamID(r, "id")
+	if err != nil {
+		return err
+	}
+	role, err := c.chatService.GetMyRole(r.Context(), chat_id)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"role": string(*role)})
 	return nil
 }

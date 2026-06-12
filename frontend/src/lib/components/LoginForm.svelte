@@ -1,9 +1,16 @@
 <script lang="ts">
     import { login, register } from "$lib/api/auth";
+    import { goto } from "$app/navigation";
 
     let {
         mode = "login",
     }: { mode?: "login" | "register" } = $props();
+
+    function getRedirectUrl(): string {
+        if (typeof window === "undefined") return "/";
+        const params = new URLSearchParams(window.location.search);
+        return params.get("redirect") || "/";
+    }
 
     function submit(e: SubmitEvent) {
         e.preventDefault();
@@ -24,7 +31,7 @@
                 return;
             }
             localStorage.setItem("token", resp.token);
-            window.location.href = "/";
+            goto(getRedirectUrl());
         })
     }
 </script>

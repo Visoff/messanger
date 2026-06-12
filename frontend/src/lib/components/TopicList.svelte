@@ -75,6 +75,25 @@
         border-right: 1px solid #e6e8eb;
     }
 
+    @media (max-width: 767px) {
+        .topic-list {
+            flex-direction: row;
+            width: 100%;
+            border-right: none;
+            border-bottom: 1px solid #e6e8eb;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .topic-list::-webkit-scrollbar {
+            display: none;
+        }
+
+        .topic-header {
+            flex-shrink: 0;
+        }
+    }
+
     .topic-header {
         font-size: 12px;
         font-weight: 600;

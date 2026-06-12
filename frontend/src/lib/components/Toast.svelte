@@ -38,6 +38,14 @@
         max-width: 360px;
     }
 
+    @media (max-width: 767px) {
+        .toast-container {
+            left: 16px;
+            right: 16px;
+            max-width: none;
+        }
+    }
+
     .toast {
         padding: 12px 16px;
         border-radius: 8px;

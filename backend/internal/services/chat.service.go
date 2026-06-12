@@ -102,6 +102,14 @@ func (dto *CreateChatDTO) Validate() error {
 }
 
 func (s *ChatService) CreateChat(ctx context.Context, dto *CreateChatDTO) (*repository.Chat, error) {
+	return s.createChatWithType(ctx, dto.Title, repository.ChatTypeGroup)
+}
+
+func (s *ChatService) CreateChannel(ctx context.Context, dto *CreateChatDTO) (*repository.Chat, error) {
+	return s.createChatWithType(ctx, dto.Title, repository.ChatTypeChannel)
+}
+
+func (s *ChatService) createChatWithType(ctx context.Context, title string, chatType repository.ChatType) (*repository.Chat, error) {
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return nil, err}
 	qtx, tx, err := s.repository.NewTx(ctx)
@@ -110,8 +118,8 @@ func (s *ChatService) CreateChat(ctx context.Context, dto *CreateChatDTO) (*repo
 		return nil, err
 	}
 	chat, err := qtx.CreateChat(ctx, &repository.CreateChatParams{
-		Title: dto.Title,
-		Type: repository.ChatTypeGroup,
+		Title: title,
+		Type: chatType,
 	})
 	if err != nil {
 		return nil, err
@@ -212,6 +220,24 @@ func (dto *CreateMessageDTO) Validate() error {
 func (s *ChatService) CreateMessage(ctx context.Context, chat_id uuid.UUID, dto *CreateMessageDTO) (*repository.Message, error) {
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return nil, err}
+
+	chat, err := s.repository.GetChat(ctx, chat_id)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("Chat not found")
+	}
+	if chat.Type == repository.ChatTypeChannel {
+		role, err := s.repository.GetUserChatRole(ctx, &repository.GetUserChatRoleParams{
+			UserID: user_id,
+			ChatID: chat_id,
+		})
+		if err != nil {
+			return nil, httperrors.NewHTTPForbiddenError("You are not a member of this channel")
+		}
+		if role != repository.ChatRoleOwner && role != repository.ChatRoleAdmin {
+			return nil, httperrors.NewHTTPForbiddenError("Only admins can send messages in channels")
+		}
+	}
+
 	msg, err := s.repository.CreateChatMessage(ctx, &repository.CreateChatMessageParams{
 		ChatID:         chat_id,
 		SenderID:       user_id,
@@ -259,6 +285,55 @@ func (s *ChatService) CreateInvitation(ctx context.Context, chat_id uuid.UUID) (
 
 func (s *ChatService) GetInvitation(ctx context.Context, id uuid.UUID) (*repository.Invitation, error) {
 	return s.repository.GetInvitationById(ctx, id)
+}
+
+func (s *ChatService) UseInvitation(ctx context.Context, id uuid.UUID) error {
+	return s.repository.UseInvitation(ctx, id)
+}
+
+type InvitationInfo struct {
+	Invitation repository.Invitation `json:"invitation"`
+	Chat       *repository.Chat      `json:"chat"`
+	Creator    *repository.User      `json:"creator"`
+}
+
+func (s *ChatService) GetInvitationInfo(ctx context.Context, id uuid.UUID) (*InvitationInfo, error) {
+	invitation, err := s.repository.GetInvitationById(ctx, id)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("Invitation not found")
+	}
+
+	chat, err := s.repository.GetChat(ctx, invitation.ChatID)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("Chat not found")
+	}
+
+	creator, err := s.repository.GetUserById(ctx, invitation.UserID)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("Creator not found")
+	}
+
+	if chat.Type == repository.ChatTypePrivate && chat.Title == "" {
+		members, err := s.repository.ListChatMembers(ctx, chat.ID)
+		if err == nil {
+			for _, member := range members {
+				if member.ID != invitation.UserID {
+					chat.Title = member.Username
+					chat.AvatarUrl = member.AvatarUrl
+					break
+				}
+			}
+		}
+		if chat.Title == "" {
+			chat.Title = creator.Username
+		}
+	}
+
+	return &InvitationInfo{
+		Invitation: *invitation,
+		Chat:       chat,
+		Creator:    creator,
+	}, nil
 }
 
 func (s *ChatService) AcceptInvitation(ctx context.Context, invitation_id uuid.UUID) (*repository.Chat, error) {
@@ -376,6 +451,23 @@ func (s *ChatService) LeaveChat(ctx context.Context, chat_id uuid.UUID) error {
 		UserID: user_id,
 		ChatID: chat_id,
 	})
+}
+
+func (s *ChatService) GetMyRole(ctx context.Context, chat_id uuid.UUID) (*repository.ChatRole, error) {
+	user_id, err := ExtractUserId(ctx)
+	if err != nil {return nil, err}
+	role, err := s.repository.GetUserChatRole(ctx, &repository.GetUserChatRoleParams{
+		UserID: user_id,
+		ChatID: chat_id,
+	})
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("You are not a member of this chat")
+	}
+	return &role, nil
+}
+
+func (s *ChatService) ListChatMembersWithRoles(ctx context.Context, chat_id uuid.UUID) ([]*repository.ListChatMembersWithRolesRow, error) {
+	return s.repository.ListChatMembersWithRoles(ctx, chat_id)
 }
 
 func (s *ChatService) MuteChat(ctx context.Context, chat_id uuid.UUID, muted bool) (*repository.Chat, error) {

@@ -1,11 +1,12 @@
 <script lang="ts">
     import LoginForm from "$lib/components/LoginForm.svelte";
     import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
 
     onMount(() => {
         const token = localStorage.getItem("token");
         if (token) {
-            window.location.href = "/";
+            goto("/");
         }
     })
 </script>
@@ -73,15 +74,15 @@
         font-weight: 400;
     }
 
+    .login-form-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
     @media (min-width: 768px) {
         .login-illustration {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .login-form-container {
-            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;

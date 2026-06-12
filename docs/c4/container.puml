@@ -1,0 +1,31 @@
+@startuml Контейнеры Мессенджера
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_LEFT_RIGHT()
+LAYOUT_WITH_LEGEND()
+
+title Container diagram — Messanger
+
+Person(user, "User", "Живой юзер, хочет общаться")
+
+System_Boundary(messenger, "Messanger") {
+    Container(spa, "Frontend", "Svelte, TypeScript", "SPA — рисует чатики, кнопочки и видео-звонки")
+    Container(api, "Backend", "Go", "Тащит бизнес-логику, JWT-авторизацию, реалтайм через SSE и пуши")
+    Container(fileStorage, "File Storage", "Rust (Axum)", "Хранит и отдаёт аватарки, файлы с поддержкой partial update и SHA хешами")
+    Container(ws, "WebRTC Service", "Go (Pion)", "Ставит звонки: WebSocket сигналинг, SFU медиа-релей и встроенный TURN сервер на :3478/UDP")
+    ContainerDb(redis, "Valkey / Redis", "In-memory", "PubSub каналы для SSE: шлёт сообщения между инстансами бекенда")
+    ContainerDb(db, "PostgreSQL", "PostgreSQL", "Хранит юзеров, чаты, сообщения, топики, подписки, категории, приглашения")
+}
+
+System_Ext(pushService, "WebPush", "Браузерный ServiceWorker — доставляет пуши")
+
+Rel(user, spa, "Тыкает и смотрит", "HTTPS")
+Rel(spa, api, "Дёргает апишку", "HTTPS, JSON")
+Rel(api, db, "Читает/пишет данные", "SQL")
+Rel(api, redis, "Pub/Sub для SSE", "TCP")
+Rel(api, pushService, "Гоняет пуши", "HTTP")
+Rel(api, fileStorage, "Шлёт/берёт файлы", "HTTP, multipart")
+Rel(spa, ws, "WebSocket сигналинг", "WSS")
+
+SHOW_LEGEND()
+@enduml

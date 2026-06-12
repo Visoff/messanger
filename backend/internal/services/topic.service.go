@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Visoff/messanger/internal/repository"
+	"github.com/Visoff/messanger/pkgs/httperrors"
 	"github.com/google/uuid"
 )
 
@@ -22,6 +23,29 @@ func (s *TopicService) ListMessages(ctx context.Context, topic_id uuid.UUID) ([]
 func (s *TopicService) CreateMessage(ctx context.Context, topic_id uuid.UUID, dto *CreateMessageDTO) (*repository.Message, error) {
 	user_id, err := ExtractUserId(ctx)
 	if err != nil {return nil, err}
+
+	topic, err := s.repository.GetTopic(ctx, topic_id)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("Topic not found")
+	}
+
+	chat, err := s.repository.GetChat(ctx, topic.ChatID)
+	if err != nil {
+		return nil, httperrors.NewHTTPNotFoundError("Chat not found")
+	}
+	if chat.Type == repository.ChatTypeChannel {
+		role, err := s.repository.GetUserChatRole(ctx, &repository.GetUserChatRoleParams{
+			UserID: user_id,
+			ChatID: topic.ChatID,
+		})
+		if err != nil {
+			return nil, httperrors.NewHTTPForbiddenError("You are not a member of this channel")
+		}
+		if role != repository.ChatRoleOwner && role != repository.ChatRoleAdmin {
+			return nil, httperrors.NewHTTPForbiddenError("Only admins can send messages in channels")
+		}
+	}
+
 	return s.repository.CreateTopicMessage(ctx, &repository.CreateTopicMessageParams{
 		TopicID:        &topic_id,
 		SenderID:       user_id,

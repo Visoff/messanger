@@ -23,6 +23,29 @@ export async function fetchChat(id: string): Promise<Chat | ErrorResponse> {
     return data;
 }
 
+export async function createChannel(title: string): Promise<Chat | ErrorResponse> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/chats/channel`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title }),
+    });
+    const data = await response.json();
+    return data;
+}
+
+export async function fetchMyRole(chat_id: string): Promise<{ role: string } | ErrorResponse> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/chats/${chat_id}/my-role`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await response.json();
+    return data;
+}
+
 export async function createChat(title: string): Promise<Chat | ErrorResponse> {
     const token = localStorage.getItem('token');
     const response = await fetch(`${API_URL}/chats/group`, {
@@ -137,4 +160,46 @@ export async function createInvitation(chat_id: string): Promise<{ id: string } 
     });
     const data = await response.json();
     return data;
+}
+
+export async function verifyInvitation(inviteId: string): Promise<any> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/invitation/${inviteId}/info`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    if (!response.ok) {
+        return { error: "Invitation not found" };
+    }
+    return response.json();
+}
+
+export async function acceptInvitation(inviteId: string): Promise<{ chat_id: string } | { error: string }> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/invitation/${inviteId}/accept`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    if (!response.ok) {
+        const data = await response.json();
+        return { error: data.error || "Failed to accept invitation" };
+    }
+    return response.json();
+}
+
+export async function rejectInvitation(inviteId: string): Promise<{ status: string } | { error: string }> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/invitation/${inviteId}`, {
+        method: 'DELETE',
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    if (!response.ok) {
+        return { error: "Failed to reject invitation" };
+    }
+    return response.json();
 }

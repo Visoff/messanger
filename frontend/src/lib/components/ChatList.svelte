@@ -65,6 +65,8 @@
             chats = loadedChats.filter(c => c.type === "private");
         } else if (filterMode === "groups") {
             chats = loadedChats.filter(c => c.type === "group" || c.type === "channel");
+        } else if (filterMode === "channels") {
+            chats = loadedChats.filter(c => c.type === "channel");
         } else if (filterMode === "category" && categoryChatIds) {
             chats = loadedChats.filter(c => categoryChatIds.includes(c.id));
         } else {

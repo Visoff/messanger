@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -12,8 +13,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-type WebRTCService struct {
-}
+type WebRTCService struct{}
 
 func NewWebRTCService() *WebRTCService {
 	return &WebRTCService{}
@@ -54,34 +54,51 @@ func (s *WebRTCService) CreateRTCPeerConnection(config webrtc.Configuration) (*w
 
 type Peer struct {
 	id   string
-	mu   sync.RWMutex
+	connMu sync.Mutex
+	pcMu   sync.Mutex
 	conn *websocket.Conn
 	pc   *webrtc.PeerConnection
 
-	pendingCandidates []webrtc.ICECandidate
 	renegotiateTimer  *time.Timer
 }
 
 func (p *Peer) Renegotiate() error {
 	log.Println("Renegotiate", p.id)
-	p.mu.Lock()
-	defer p.mu.Unlock()
+
+	p.pcMu.Lock()
+	if p.pc.SignalingState() != webrtc.SignalingStateStable {
+		state := p.pc.SignalingState()
+		p.pcMu.Unlock()
+		log.Printf("Renegotiate: PC not stable (state=%v), rescheduling", state)
+		p.ScheduleRenegotiation()
+		return nil
+	}
+
 	offer, err := p.pc.CreateOffer(nil)
 	if err != nil {
+		p.pcMu.Unlock()
 		return err
 	}
-
 	err = p.pc.SetLocalDescription(offer)
 	if err != nil {
+		p.pcMu.Unlock()
 		return err
 	}
 
-	p.pendingCandidates = nil
+	ld := p.pc.LocalDescription()
+	if ld == nil || ld.SDP == "" {
+		p.pcMu.Unlock()
+		return fmt.Errorf("local description is empty after SetLocalDescription")
+	}
+	offer = *ld
+	p.pcMu.Unlock()
 
+	p.connMu.Lock()
 	err = p.conn.WriteJSON(&RTCMessage{
-		Type: "offer",
-		Offer: p.pc.LocalDescription(),
+		Type:  "offer",
+		Offer: &offer,
 	})
+	p.connMu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -90,8 +107,6 @@ func (p *Peer) Renegotiate() error {
 }
 
 func (p *Peer) ScheduleRenegotiation() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	if p.renegotiateTimer != nil {
 		p.renegotiateTimer.Stop()
 	}

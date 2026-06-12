@@ -50,12 +50,13 @@ func NewWebRTCController(ws_updater *websocket.Upgrader, webrtc_service *WebRTCS
 	c.rooms = make(map[string]*Room)
 
 	mux.Handle("/room/{id}", http.HandlerFunc(c.HandleRoom))
+	mux.Handle("/conference/room", http.HandlerFunc(c.HandleCreateRoom))
 
-	public_id, err := net.LookupIP(os.Getenv("PUBLIC_IP"))
+	publicIPs, err := net.LookupIP(os.Getenv("PUBLIC_IP"))
 	if err != nil {
 		panic(err)
 	}
-	if public_id == nil {
+	if len(publicIPs) == 0 {
 		panic("PUBLIC_IP is not set")
 	}
 
@@ -70,7 +71,7 @@ func NewWebRTCController(ws_updater *websocket.Upgrader, webrtc_service *WebRTCS
 				PacketConn: webrtc_service.MustCreateUDPListener("0.0.0.0:3478"),
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					Address:      "0.0.0.0",
-					RelayAddress: public_id[0],
+					RelayAddress: publicIPs[0],
 				},
 			},
 		},
@@ -87,11 +88,31 @@ func (c *WebRTCController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.mux.ServeHTTP(w, r)
 }
 
+func (c *WebRTCController) HandleCreateRoom(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+	id := uuid.New().String()
+	c.roomsMU.Lock()
+	c.rooms[id] = &Room{
+		id:               id,
+		peers:            make(map[string]*Peer),
+		peersMU:          sync.RWMutex{},
+		trackForwarders:  make(map[string]*TrackForwarder),
+		trackForwarderMU: sync.RWMutex{},
+	}
+	c.roomsMU.Unlock()
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(id))
+}
+
 type RTCMessage struct {
 	Type      string                     `json:"type"`
 	Offer     *webrtc.SessionDescription `json:"offer"`
 	Answer    *webrtc.SessionDescription `json:"answer"`
 	Candidate *webrtc.ICECandidateInit   `json:"candidate"`
+	PeerID    string                     `json:"peer_id,omitempty"`
 }
 
 func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
@@ -100,11 +121,12 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	defer conn.Close()
 
 	id := r.PathValue("id")
 	if id == "" {
 		log.Println("Room id is not set")
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(1008, "room id required"))
+		conn.Close()
 		return
 	}
 
@@ -140,7 +162,13 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	peer := &Peer{conn: conn, pc: pc}
+	peer_id := uuid.New().String()
+	peer := &Peer{
+		id:   peer_id,
+		conn: conn,
+		pc:   pc,
+	}
+
 	done := make(chan struct{})
 	defer close(done)
 
@@ -152,10 +180,10 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 			case <-done:
 				return
 			case <-ticker.C:
-				peer.mu.Lock()
+				peer.connMu.Lock()
 				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 				err := conn.WriteMessage(websocket.PingMessage, nil)
-				peer.mu.Unlock()
+				peer.connMu.Unlock()
 				if err != nil {
 					return
 				}
@@ -169,20 +197,19 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
-	peer_id := uuid.New().String()
 	room.peersMU.Lock()
 	room.peers[peer_id] = peer
 	room.peersMU.Unlock()
 
 	for k, v := range room.trackForwarders {
-		localTrack, err := webrtc.NewTrackLocalStaticRTP(v.source.Codec().RTPCodecCapability, v.source.ID(), v.source.StreamID())
+		localTrackID := fmt.Sprintf("%s-%s", v.sourcePeerID, v.source.ID())
+		localStreamID := fmt.Sprintf("%s-%s", v.sourcePeerID, v.source.StreamID())
+		localTrack, err := webrtc.NewTrackLocalStaticRTP(v.source.Codec().RTPCodecCapability, localTrackID, localStreamID)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		peer.mu.Lock()
-		_, err = peer.pc.AddTrack(localTrack)
-		peer.mu.Unlock()
+		_, err = pc.AddTrack(localTrack)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -194,15 +221,50 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 	peer.ScheduleRenegotiation()
 
 	defer func() {
+		room.peersMU.RLock()
+		for _, p := range room.peers {
+			if p.id == peer_id {
+				continue
+			}
+			p.connMu.Lock()
+			p.conn.WriteJSON(RTCMessage{Type: "peer_left", PeerID: peer_id})
+			p.connMu.Unlock()
+		}
+		room.peersMU.RUnlock()
+
+		peer.connMu.Lock()
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(1001, "leaving"))
+		peer.connMu.Unlock()
+		conn.Close()
+
+		room.trackForwarderMU.Lock()
+		for key, fw := range room.trackForwarders {
+			if fw.sourcePeerID == peer_id {
+				fw.cancel()
+				delete(room.trackForwarders, key)
+			}
+		}
+		room.trackForwarderMU.Unlock()
+
 		room.peersMU.Lock()
 		delete(room.peers, peer_id)
 		room.peersMU.Unlock()
+
 		pc.Close()
+
+		c.roomsMU.Lock()
+		room.peersMU.RLock()
+		empty := len(room.peers) == 0
+		room.peersMU.RUnlock()
+		if empty {
+			delete(c.rooms, id)
+		}
+		c.roomsMU.Unlock()
 	}()
 
 	pc.OnTrack(func(tr *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
 		room.trackForwarderMU.Lock()
-		key := fmt.Sprintf("%v:%v", tr.PayloadType, tr.ID())
+		key := fmt.Sprintf("%v:%v:%v", peer_id, tr.PayloadType(), tr.ID())
 		forwarder := &TrackForwarder{
 			source:       tr,
 			sourcePeerID: peer_id,
@@ -223,14 +285,16 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 		room.peersMU.RUnlock()
 
 		for k, v := range otherPeers {
-			localTrack, err := webrtc.NewTrackLocalStaticRTP(forwarder.source.Codec().RTPCodecCapability, forwarder.source.ID(), forwarder.source.StreamID())
+			localTrackID := fmt.Sprintf("%s-%s", forwarder.sourcePeerID, forwarder.source.ID())
+			localStreamID := fmt.Sprintf("%s-%s", forwarder.sourcePeerID, forwarder.source.StreamID())
+			localTrack, err := webrtc.NewTrackLocalStaticRTP(forwarder.source.Codec().RTPCodecCapability, localTrackID, localStreamID)
 			if err != nil {
 				log.Println(err)
 				continue
 			}
-			v.mu.Lock()
+			v.pcMu.Lock()
 			_, err = v.pc.AddTrack(localTrack)
-			v.mu.Unlock()
+			v.pcMu.Unlock()
 			if err != nil {
 				log.Println(err)
 				continue
@@ -246,43 +310,57 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 			rtp_buf := make([]byte, 1500)
 			for {
 				select {
-					case <-ctx.Done():
-						return;
-					default:
-						n, _, err := forwarder.source.Read(rtp_buf)
+				case <-ctx.Done():
+					return
+				default:
+					n, _, err := forwarder.source.Read(rtp_buf)
+					if err != nil {
+						log.Println(err)
+						return
+					}
+					forwarder.localTracksMU.RLock()
+					for _, v := range forwarder.localTracks {
+						_, err = v.Write(rtp_buf[:n])
 						if err != nil {
 							log.Println(err)
+							forwarder.localTracksMU.RUnlock()
 							return
 						}
-						forwarder.localTracksMU.RLock()
-						for _, v := range forwarder.localTracks {
-							_, err = v.Write(rtp_buf[:n])
-							if err != nil {
-								log.Println(err)
-								return
-							}
-						}
-						forwarder.localTracksMU.RUnlock()
+					}
+					forwarder.localTracksMU.RUnlock()
 				}
 			}
 		}()
 	})
 
 	pc.OnICECandidate(func(i *webrtc.ICECandidate) {
-		if i != nil {
-			peer.mu.Lock()
-			ice := i.ToJSON()
-			peer.conn.WriteJSON(RTCMessage{Type: "candidate", Candidate: &ice})
-			peer.mu.Unlock()
+		if i == nil {
+			return
+		}
+		ice := i.ToJSON()
+
+		if ice.SDPMid == nil || *ice.SDPMid == "" {
+			log.Println("skipping ICE candidate with empty SDPMid")
+			return
+		}
+
+		peer.connMu.Lock()
+		err := conn.WriteJSON(RTCMessage{Type: "candidate", Candidate: &ice})
+		peer.connMu.Unlock()
+		if err != nil {
+			log.Println("OnICECandidate write error:", err)
 		}
 	})
 
 	var pendingIceCandidates []*webrtc.ICECandidateInit
 
 	for {
-		msg_type, msg, err := peer.conn.ReadMessage()
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		msg_type, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Println(err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				log.Println("ws read error:", err)
+			}
 			break
 		}
 		switch msg_type {
@@ -294,77 +372,100 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 			}
 			switch message.Type {
 			case "offer":
-				peer.mu.Lock()
-				err := peer.pc.SetRemoteDescription(*message.Offer)
-				peer.mu.Unlock()
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-
-				peer.mu.Lock()
-				answer, err := peer.pc.CreateAnswer(nil)
-				peer.mu.Unlock()
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-
-				peer.mu.Lock()
-				err = peer.pc.SetLocalDescription(answer)
-				peer.mu.Unlock()
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-
-				peer.mu.Lock()
-				err = conn.WriteJSON(RTCMessage{Type: "answer", Answer: &answer})
-				peer.mu.Unlock()
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				for _, candidate := range pendingIceCandidates {
-					peer.mu.Lock()
-					err = peer.pc.AddICECandidate(*candidate)
-					peer.mu.Unlock()
-					if err != nil {
-						log.Println(err)
-						continue
+				var pcErr error
+				var localDesc *webrtc.SessionDescription
+				func() {
+					peer.pcMu.Lock()
+					defer peer.pcMu.Unlock()
+					if err := pc.SetRemoteDescription(*message.Offer); err != nil {
+						pcErr = err
+						return
 					}
+					answer, err := pc.CreateAnswer(nil)
+					if err != nil {
+						pcErr = err
+						return
+					}
+					if err := pc.SetLocalDescription(answer); err != nil {
+						pcErr = err
+						return
+					}
+					localDesc = pc.LocalDescription()
+				}()
+				if pcErr != nil {
+					log.Println(pcErr)
+					continue
+				}
+
+				peer.connMu.Lock()
+				err = conn.WriteJSON(RTCMessage{
+					Type:   "answer",
+					Answer: localDesc,
+				})
+				peer.connMu.Unlock()
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+
+				for _, candidate := range pendingIceCandidates {
+					peer.pcMu.Lock()
+					if err := pc.AddICECandidate(*candidate); err != nil {
+						log.Println(err)
+					}
+					peer.pcMu.Unlock()
 				}
 				pendingIceCandidates = nil
+
 			case "answer":
-				peer.mu.Lock()
-				err := peer.pc.SetRemoteDescription(*message.Answer)
-				peer.mu.Unlock()
-				if err != nil {
-					log.Println(err)
+				if message.Answer == nil || message.Answer.SDP == "" {
+					log.Println("answer has empty SDP, skipping")
 					continue
 				}
+				var pcErr error
+				func() {
+					peer.pcMu.Lock()
+					defer peer.pcMu.Unlock()
+					pcErr = pc.SetRemoteDescription(*message.Answer)
+				}()
+				if pcErr != nil {
+					log.Printf("SetRemoteDescription(answer) error: %v, SDP length: %d", pcErr, len(message.Answer.SDP))
+					continue
+				}
+
+				for _, candidate := range pendingIceCandidates {
+					peer.pcMu.Lock()
+					if err := pc.AddICECandidate(*candidate); err != nil {
+						log.Println(err)
+					}
+					peer.pcMu.Unlock()
+				}
+				pendingIceCandidates = nil
+
 			case "candidate":
-				peer.mu.Lock()
-				offer := peer.pc.RemoteDescription()
-				peer.mu.Unlock()
-				if offer == nil {
+				var remoteDesc *webrtc.SessionDescription
+				func() {
+					peer.pcMu.Lock()
+					defer peer.pcMu.Unlock()
+					remoteDesc = pc.RemoteDescription()
+				}()
+				if remoteDesc == nil {
 					pendingIceCandidates = append(pendingIceCandidates, message.Candidate)
 					continue
 				}
-				peer.mu.Lock()
-				err := peer.pc.AddICECandidate(*message.Candidate)
-				peer.mu.Unlock()
-				if err != nil {
+				peer.pcMu.Lock()
+				if err := pc.AddICECandidate(*message.Candidate); err != nil {
 					log.Println(err)
-					continue
 				}
+				peer.pcMu.Unlock()
+
 			default:
 				log.Println("Unknown message type", message.Type)
 			}
 		case websocket.PingMessage:
-			peer.mu.Lock()
-			peer.conn.WriteMessage(websocket.PongMessage, nil)
-			peer.mu.Unlock()
+			peer.connMu.Lock()
+			conn.WriteMessage(websocket.PongMessage, nil)
+			peer.connMu.Unlock()
 		case websocket.CloseMessage:
 			return
 		}

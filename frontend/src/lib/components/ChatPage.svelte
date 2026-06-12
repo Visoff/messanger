@@ -12,10 +12,12 @@
 
     let {
         chat_id,
-        onclose
+        onclose,
+        onleave
     }: {
         chat_id: string,
-        onclose: () => void
+        onclose: () => void,
+        onleave?: () => void
     } = $props();
 
     let topic_id: string | undefined = $state(extractFromSearchParams("topic_id"));
@@ -61,7 +63,7 @@
 </script>
 
 <div class="chat-panel">
-    <ChatViewDialog bind:this={chatModal} {chat_id} topic_id={topic_id} />
+    <ChatViewDialog bind:this={chatModal} {chat_id} topic_id={topic_id} {onleave} />
 
     <div class="chat-header">
         {#if topic_id}
@@ -177,9 +179,9 @@
         overflow: hidden;
     }
 
-    @media (max-width: 768px) {
-        .chat-panel {
-            display: none;
+    @media (max-width: 767px) {
+        .chat-content {
+            flex-direction: column;
         }
     }
 </style>

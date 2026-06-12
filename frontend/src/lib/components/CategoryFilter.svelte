@@ -71,6 +71,11 @@
         isOpen = false;
     }
 
+    function selectChannels() {
+        oncategorieselect("channels");
+        isOpen = false;
+    }
+
     function selectCategory(cat: UserCategory) {
         oncategorieselect("category", cat);
         isOpen = false;
@@ -119,6 +124,7 @@
         if (activeCategory.mode === "all") return "All Chats";
         if (activeCategory.mode === "personal") return "Personal";
         if (activeCategory.mode === "groups") return "Groups";
+        if (activeCategory.mode === "channels") return "Channels";
         if (activeCategory.mode === "category" && activeCategory.category) return activeCategory.category.name;
         return "Category";
     }
@@ -137,6 +143,7 @@
             <button class="dropdown-item" onclick={selectAllChats}>All Chats</button>
             <button class="dropdown-item" onclick={selectPersonal}>Personal</button>
             <button class="dropdown-item" onclick={() => oncategorieselect("groups")}>Groups</button>
+            <button class="dropdown-item" onclick={selectChannels}>Channels</button>
 
             {#each categories as cat (cat.id)}
                 <button class="dropdown-item" onclick={() => selectCategory(cat)}>

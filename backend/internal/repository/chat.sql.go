@@ -7,6 +7,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -18,7 +19,9 @@ INSERT INTO chat_members (
     role
 ) VALUES (
     $1, $2, $3
-)
+) ON CONFLICT (user_id, chat_id) DO UPDATE SET
+    left_at = NULL,
+    role = EXCLUDED.role
 `
 
 type AddUserToChatParams struct {
@@ -37,8 +40,8 @@ SELECT chats.id FROM chats
 JOIN chat_members cm1 ON cm1.chat_id = chats.id
 JOIN chat_members cm2 ON cm2.chat_id = chats.id
 WHERE chats.type = 'private'
-  AND cm1.user_id = $1
-  AND cm2.user_id = $2
+  AND cm1.user_id = $1 AND cm1.left_at IS NULL
+  AND cm2.user_id = $2 AND cm2.left_at IS NULL
 LIMIT 1
 `
 
@@ -129,6 +132,22 @@ func (q *Queries) GetChatLastMessage(ctx context.Context, chatID uuid.UUID) (*Me
 	return &i, err
 }
 
+const getUserChatRole = `-- name: GetUserChatRole :one
+SELECT role FROM chat_members WHERE user_id = $1 AND chat_id = $2 AND left_at IS NULL
+`
+
+type GetUserChatRoleParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	ChatID uuid.UUID `json:"chat_id"`
+}
+
+func (q *Queries) GetUserChatRole(ctx context.Context, arg *GetUserChatRoleParams) (ChatRole, error) {
+	row := q.db.QueryRow(ctx, getUserChatRole, arg.UserID, arg.ChatID)
+	var role ChatRole
+	err := row.Scan(&role)
+	return role, err
+}
+
 const joinUserToChat = `-- name: JoinUserToChat :exec
 INSERT INTO chat_members (
     user_id,
@@ -151,7 +170,7 @@ func (q *Queries) JoinUserToChat(ctx context.Context, arg *JoinUserToChatParams)
 const listChatMembers = `-- name: ListChatMembers :many
 SELECT users.id, users.username, users.password_hash, users.avatar_url, users.metadata, users.created_at, users.updated_at, users.deleted_at, users.last_seen_at from users
 join chat_members on chat_members.user_id = users.id
-where chat_members.chat_id = $1
+where chat_members.chat_id = $1 AND chat_members.left_at IS NULL
 `
 
 func (q *Queries) ListChatMembers(ctx context.Context, chatID uuid.UUID) ([]*User, error) {
@@ -184,10 +203,60 @@ func (q *Queries) ListChatMembers(ctx context.Context, chatID uuid.UUID) ([]*Use
 	return items, nil
 }
 
+const listChatMembersWithRoles = `-- name: ListChatMembersWithRoles :many
+SELECT users.id, users.username, users.password_hash, users.avatar_url, users.metadata, users.created_at, users.updated_at, users.deleted_at, users.last_seen_at, chat_members.role FROM users
+JOIN chat_members ON chat_members.user_id = users.id
+WHERE chat_members.chat_id = $1 AND chat_members.left_at IS NULL
+`
+
+type ListChatMembersWithRolesRow struct {
+	ID           uuid.UUID  `json:"id"`
+	Username     string     `json:"username"`
+	PasswordHash string     `json:"password_hash"`
+	AvatarUrl    *string    `json:"avatar_url"`
+	Metadata     []byte     `json:"metadata"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	DeletedAt    *time.Time `json:"deleted_at"`
+	LastSeenAt   time.Time  `json:"last_seen_at"`
+	Role         ChatRole   `json:"role"`
+}
+
+func (q *Queries) ListChatMembersWithRoles(ctx context.Context, chatID uuid.UUID) ([]*ListChatMembersWithRolesRow, error) {
+	rows, err := q.db.Query(ctx, listChatMembersWithRoles, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListChatMembersWithRolesRow
+	for rows.Next() {
+		var i ListChatMembersWithRolesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.PasswordHash,
+			&i.AvatarUrl,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.LastSeenAt,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listChats = `-- name: ListChats :many
 SELECT chats.id, chats.title, chats.type, chats.avatar_url, chats.metadata, chats.created_at, chats.updated_at, chats.deleted_at from chats
 left join chat_members on chat_members.chat_id = chats.id
-where chat_members.user_id = $1
+where chat_members.user_id = $1 AND chat_members.left_at IS NULL
 `
 
 func (q *Queries) ListChats(ctx context.Context, userID uuid.UUID) ([]*Chat, error) {
@@ -259,7 +328,7 @@ func (q *Queries) ListChatsLastMessages(ctx context.Context, dollar_1 []uuid.UUI
 const listUserChats = `-- name: ListUserChats :many
 SELECT c.id, c.title, c.type, c.avatar_url, c.metadata, c.created_at, c.updated_at, c.deleted_at FROM chats c
 JOIN chat_members cm ON cm.chat_id = c.id
-WHERE cm.user_id = $1
+WHERE cm.user_id = $1 AND cm.left_at IS NULL
 ORDER BY c.updated_at DESC
 `
 
@@ -293,7 +362,7 @@ func (q *Queries) ListUserChats(ctx context.Context, userID uuid.UUID) ([]*Chat,
 }
 
 const removeUserFromChat = `-- name: RemoveUserFromChat :exec
-DELETE FROM chat_members
+UPDATE chat_members SET left_at = NOW()
 WHERE user_id = $1 AND chat_id = $2
 `
 

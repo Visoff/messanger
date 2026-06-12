@@ -1,0 +1,152 @@
+@startuml Компоненты Мессенджера
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_LEFT_RIGHT()
+LAYOUT_WITH_LEGEND()
+
+title Component diagram — Messanger
+
+Person(user, "User", "Живой юзер")
+
+System_Boundary(spa, "Frontend") {
+    Container_Boundary(fe_components, "UI Components") {
+        Component(chatPage, "ChatPage", "Svelte", "Главный экран: управляет чатами, топиками, сообщениями")
+        Component(chatList, "ChatList", "Svelte", "Сайдбар со списком чатов, фильтрация по категориям, SSE-обновления")
+        Component(chatViewDialog, "ChatViewDialog", "Svelte", "Модалка с инфой о чате: участники, инвайт, топики, аватарка, мут, лив")
+        Component(chatCreationModel, "ChatCreationModel", "Svelte", "Создание группы, канала, приватного чата + поиск юзера")
+        Component(messageList, "MessageList", "Svelte", "Лента сообщений, SSE-подписка на новые, реплаи")
+        Component(topicList, "TopicList", "Svelte", "Список топиков: текстовые (открыть чат) и войс (открыть звонок)")
+        Component(loginForm, "LoginForm", "Svelte", "Логин и регистрация")
+        Component(dialog, "Dialog", "Svelte", "Многоразовая обёртка над <dialog>")
+        Component(toast, "Toast", "Svelte", "Системные уведомления (успех/ошибка/инфо)")
+        Component(accountMenu, "AccountMenu", "Svelte", "Профиль юзера: аватарка, редактирование имени, логаут")
+        Component(categoryFilter, "CategoryFilter", "Svelte", "Фильтр чатов по категориям + создание своих")
+        Component(privateChatInfo, "PrivateChatInfo", "Svelte", "Инфокарточка собеседника в личке")
+    }
+
+    Container_Boundary(fe_api, "API Modules") {
+        Component(apiAuth, "Auth API", "TypeScript", "login, register, getMe, uploadAvatar, updateUser")
+        Component(apiChats, "Chats API", "TypeScript", "CRUD чатов, инвайты, участники, роли, аватарки")
+        Component(apiTopics, "Topics API", "TypeScript", "CRUD топиков, получение сообщений по топику")
+        Component(apiUsers, "Users API", "TypeScript", "Поиск юзера по нику")
+        Component(apiMessages, "Messages API", "TypeScript", "Получение и отправка сообщений")
+        Component(apiCategories, "Categories API", "TypeScript", "CRUD пользовательских категорий")
+    }
+
+    Component(stores, "Stores", "TypeScript", "Глобальное состояние: user и messages")
+    Component(types, "Types", "TypeScript", "Общие типы на весь фронт")
+}
+
+System_Boundary(be, "Backend") {
+    Container_Boundary(controllers, "Controllers") {
+        Component(chatCtrl, "ChatController", "Go", "CRUD чатов, инвайты, участники, роли, мут, лив, аватарки, сообщения, топики")
+        Component(topicCtrl, "TopicController", "Go", "Получение топика, сообщений по топику")
+        Component(userCtrl, "UserController", "Go", "Регистрация, логин, профиль, аватарка, поиск по нику/ID")
+        Component(pubsubCtrl, "PubSubController", "Go", "SSE-стрим, ключи пуша, подписка/отписка пуша")
+        Component(categoryCtrl, "CategoryController", "Go", "CRUD пользовательских категорий")
+        Component(invitationCtrl, "InvitationController", "Go", "Инфо/принять/отклонить приглашение по коду")
+    }
+
+    Container_Boundary(services, "Services") {
+        Component(authSvc, "AuthService", "Go", "bcrypt для паролей, JWT для токенов, ProtectRoute middleware")
+        Component(chatSvc, "ChatService", "Go", "Бизнес-логика чатов: создание, приглашения, уход, мут, роли")
+        Component(topicSvc, "TopicService", "Go", "Бизнес-логика топиков: создание, сообщения")
+        Component(userSvc, "UserService", "Go", "Регистрация, логин, профиль, поиск")
+        Component(webpushSvc, "WebPushService", "Go", "VAPID ключи, рассылка пушей через Web Push Protocol")
+        Component(pubsubSvc, "PubSubService", "Go", "Redis PubSub: подписка/публикация событий")
+        Component(categorySvc, "CategoryService", "Go", "Бизнес-логика категорий")
+    }
+
+    Container_Boundary(repo, "Repository") {
+        Component(chatRepo, "ChatRepo", "Go/SQL", "Запросы к чатам, членам, инвайтам")
+        Component(topicRepo, "TopicRepo", "Go/SQL", "Запросы к топикам")
+        Component(userRepo, "UserRepo", "Go/SQL", "Запросы к юзерам")
+        Component(msgRepo, "MessageRepo", "Go/SQL", "Запросы к сообщениям")
+        Component(invRepo, "InvitationRepo", "Go/SQL", "Запросы к приглашениям")
+        Component(subRepo, "SubscriptionRepo", "Go/SQL", "Запросы к пуш-подпискам")
+        Component(categoryRepo, "CategoryRepo", "Go/SQL", "Запросы к категориям")
+    }
+
+    Component(migrations, "Migrations", "Go/Goose", "Schema versioning (9 миграций)")
+}
+
+System_Ext(fileStoreSvc, "File Storage Service", "Rust (Axum)", "Загружает/отдаёт/патчит файлы по UUID (:3001)")
+
+System_Boundary(db, "Database Layer") {
+    ComponentDb(usersDb, "users", "Table", "Аккаунты, хеши паролей, аватарки, метаданные")
+    ComponentDb(chatsDb, "chats", "Table", "Комнаты: private/group/channel с заголовком и типом")
+    ComponentDb(chatMembersDb, "chat_members", "Table", "UNIQUE(user_id, chat_id) + роль owner/admin/member")
+    ComponentDb(topicsDb, "topics", "Table", "Топики (text_topic/voice_topic) внутри чатов")
+    ComponentDb(messagesDb, "messages", "Table", "Сообщения с поддержкой реплаев и топиков")
+    ComponentDb(invitationDb, "invitation", "Table", "Приглашения по user_id + chat_id с soft-delete")
+    ComponentDb(subscriptionsDb, "push_subscriptions", "Table", "VAPID-подписки для веб-пушей")
+    ComponentDb(categoriesDb, "user_categories", "Table", "JSONB поле chat_ids — пользовательские категории")
+    ComponentDb(redisDb, "Valkey/Redis", "In-memory", "PubSub каналы для SSE, проверка онлайн-статуса")
+}
+
+Rel(user, chatPage, "Сидит в мессенджере")
+Rel(chatPage, chatList, "Показывает")
+Rel(chatPage, messageList, "Показывает")
+Rel(chatPage, topicList, "Показывает")
+Rel(chatPage, chatViewDialog, "Открывает")
+Rel(chatPage, chatCreationModel, "Открывает")
+Rel(chatPage, accountMenu, "Открывает")
+Rel(chatPage, categoryFilter, "Показывает")
+Rel(chatViewDialog, dialog, "Рендерит")
+Rel(chatViewDialog, toast, "Показывает")
+Rel(chatCreationModel, dialog, "Рендерит")
+Rel(chatCreationModel, privateChatInfo, "Показывает")
+
+Rel(chatList, apiChats, "Дёргает")
+Rel(chatViewDialog, apiChats, "Дёргает")
+Rel(chatViewDialog, apiTopics, "Дёргает")
+Rel(chatViewDialog, apiUsers, "Дёргает")
+Rel(chatCreationModel, apiChats, "Дёргает")
+Rel(chatCreationModel, apiUsers, "Дёргает")
+Rel(messageList, apiMessages, "Дёргает")
+Rel(loginForm, apiAuth, "Дёргает")
+Rel(accountMenu, apiAuth, "Дёргает")
+Rel(categoryFilter, apiCategories, "Дёргает")
+
+Rel(apiAuth, userCtrl, "HTTP/REST")
+Rel(apiChats, chatCtrl, "HTTP/REST")
+Rel(apiTopics, topicCtrl, "HTTP/REST")
+Rel(apiUsers, userCtrl, "HTTP/REST")
+Rel(apiMessages, chatCtrl, "HTTP/REST")
+Rel(apiMessages, topicCtrl, "HTTP/REST")
+Rel(apiCategories, categoryCtrl, "HTTP/REST")
+
+Rel(chatCtrl, chatSvc, "Вызывает")
+Rel(topicCtrl, topicSvc, "Вызывает")
+Rel(userCtrl, userSvc, "Вызывает")
+Rel(pubsubCtrl, pubsubSvc, "Вызывает")
+Rel(pubsubCtrl, webpushSvc, "Вызывает")
+Rel(categoryCtrl, categorySvc, "Вызывает")
+Rel(invitationCtrl, chatSvc, "Вызывает")
+
+Rel(chatSvc, chatRepo, "Лезет в БД")
+Rel(chatSvc, invRepo, "Лезет в БД")
+Rel(chatSvc, authSvc, "Проверяет")
+Rel(topicSvc, topicRepo, "Лезет в БД")
+Rel(userSvc, userRepo, "Лезет в БД")
+Rel(pubsubSvc, msgRepo, "Лезет в БД")
+Rel(webpushSvc, subRepo, "Лезет в БД")
+Rel(categorySvc, categoryRepo, "Лезет в БД")
+
+Rel(chatSvc, webpushSvc, "Шлёт уведомления")
+Rel(chatSvc, pubsubSvc, "Постит события")
+
+Rel(chatRepo, chatsDb, "SQL")
+Rel(chatRepo, chatMembersDb, "SQL")
+Rel(topicRepo, topicsDb, "SQL")
+Rel(userRepo, usersDb, "SQL")
+Rel(msgRepo, messagesDb, "SQL")
+Rel(invRepo, invitationDb, "SQL")
+Rel(subRepo, subscriptionsDb, "SQL")
+Rel(categoryRepo, categoriesDb, "SQL")
+Rel(pubsubSvc, redisDb, "Pub/Sub")
+
+Rel(chatSvc, fileStoreSvc, "Гоняет аватарки", "HTTP")
+
+SHOW_LEGEND()
+@enduml

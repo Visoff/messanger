@@ -1,5 +1,6 @@
 <script lang="ts">
     import Dialog from "./Dialog.svelte";
+    import { goto } from "$app/navigation";
     import { user } from "$lib/stores/user";
     import { updateUser, uploadAvatar } from "$lib/api/auth";
 
@@ -54,7 +55,7 @@
     function logout() {
         localStorage.removeItem("token");
         user.set(undefined);
-        window.location.href = "/login";
+        goto("/login");
     }
 
     function formatDate(d: Date | string): string {

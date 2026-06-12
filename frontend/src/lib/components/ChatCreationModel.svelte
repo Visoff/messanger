@@ -1,6 +1,6 @@
 <script lang="ts">
     import Dialog from "./Dialog.svelte";
-    import { createChat, createPrivateChat } from "$lib/api/chats";
+    import { createChat, createChannel, createPrivateChat } from "$lib/api/chats";
     import { API_URL } from "$lib/api/env";
     import type { User } from "$lib/types";
 
@@ -79,9 +79,26 @@
         e.preventDefault();
         creating = true;
         const title = (e.target as HTMLFormElement)["title"].value;
-        createChat(title).then(() => {
-            location.reload();
-        });
+        const resp = await createChat(title);
+        if ("error" in resp) {
+            creating = false;
+            return;
+        }
+        dialog?.close();
+        onchatstarted?.(resp.id);
+    }
+
+    async function handleChannelCreate(e: SubmitEvent) {
+        e.preventDefault();
+        creating = true;
+        const title = (e.target as HTMLFormElement)["channel_title"].value;
+        const resp = await createChannel(title);
+        if ("error" in resp) {
+            creating = false;
+            return;
+        }
+        dialog?.close();
+        onchatstarted?.(resp.id);
     }
 
     function startCall() {
@@ -139,7 +156,12 @@
             {/if}
 
             {#if dialog_mode === "channel"}
-                <input type="text" placeholder="Channel name" class="w-full p-1 rounded" />
+                <form onsubmit={handleChannelCreate}>
+                    <input type="text" name="channel_title" placeholder="Channel name" class="w-full mb-2 p-1 rounded" />
+                    <button type="submit" class="w-full p-1 bg-blue-300 hover:bg-blue-400 rounded text-sm" disabled={creating}>
+                        {creating ? 'Creating...' : 'Create'}
+                    </button>
+                </form>
             {/if}
         </div>
     </Dialog>

@@ -1,14 +1,43 @@
 <script lang="ts">
     import { API_URL, WEBSOCKET_URL } from "$lib/api/env";
     import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
 
     let localStream: MediaStream | undefined = $state(undefined);
-    let remoteStream: MediaStream | undefined = $state(undefined);
+    let remoteStreams: MediaStream[] = $state([]);
     let roomId: string = $state("");
     let participants = $state(1);
     let audioMuted = $state(false);
     let videoOff = $state(false);
+    let iceFailed = $state(false);
     let ws: WebSocket | undefined;
+    let peer: RTCPeerConnection | undefined;
+    let callEnded = false;
+
+    function cleanup() {
+        if (callEnded) return;
+        callEnded = true;
+        localStream?.getTracks().forEach(t => t.stop());
+        peer?.close();
+        ws?.close();
+    }
+
+    function removeRemoteStream(streamId: string) {
+        const s = remoteStreams.find(s => s.id === streamId);
+        if (s) {
+            s.getTracks().forEach(t => t.stop());
+            remoteStreams = remoteStreams.filter(s => s.id !== streamId);
+        }
+    }
+
+    function removeRemoteStreamsByPeerId(peerId: string) {
+        const prefix = peerId + "-";
+        const removed = remoteStreams.filter(s =>
+            s.getTracks().some(t => t.id.startsWith(prefix))
+        );
+        removed.forEach(s => s.getTracks().forEach(t => t.stop()));
+        remoteStreams = remoteStreams.filter(s => !removed.includes(s));
+    }
 
     function toggleAudio() {
         if (!localStream) return;
@@ -25,159 +54,197 @@
     function leaveCall() {
         ws?.close();
         localStream?.getTracks().forEach(t => t.stop());
-        if (window.opener) {
-            window.close();
-        } else {
-            window.location.href = "/";
-        }
-    }
-
-    onMount(async () => {
-        const url = new URL(window.location.href);
-        let id = url.searchParams.get("room_id");
-        if (id) {
-            roomId = id;
-        } else {
-            const resp = await fetch(`${API_URL}/conference/room`, { method: "POST" });
-            id = await resp.text();
-            roomId = id;
-            url.searchParams.set("room_id", id);
-            window.history.replaceState({}, "", url.toString());
-        }
-
-        const ip = import.meta.env.VITE_WEBRTC_SERVER_IP;
-
-        const peer = new RTCPeerConnection({
-            iceServers: [
-                { urls: `stun:${ip}:3478` },
-                {
-                    urls: [`turn:${ip}:3478`],
-                    username: "username",
-                    credential: "password",
-                },
-            ],
-            iceTransportPolicy: "all",
-        });
-
-        const pendingIceCandidates: RTCIceCandidateInit[] = [];
-
-        ws = new WebSocket(`${WEBSOCKET_URL}/room/${roomId}`);
-
-        const msgQueue: string[] = [];
-        let processing = false;
-
-        async function processMessage(raw: string) {
-            const data = JSON.parse(raw);
-            try {
-                if (data.type === "offer") {
-                    await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
-                    const answer = await peer.createAnswer();
-                    await peer.setLocalDescription(answer);
-                    ws?.send(JSON.stringify({ type: "answer", answer }));
-                    for (const c of pendingIceCandidates) {
-                        await peer.addIceCandidate(new RTCIceCandidate(c));
-                    }
-                    pendingIceCandidates.length = 0;
-                } else if (data.type === "answer") {
-                    await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
-                    for (const c of pendingIceCandidates) {
-                        await peer.addIceCandidate(new RTCIceCandidate(c));
-                    }
-                    pendingIceCandidates.length = 0;
-                } else if (data.type === "candidate") {
-                    if (peer.remoteDescription) {
-                        await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
-                    } else {
-                        pendingIceCandidates.push(data.candidate);
-                    }
-                }
-            } catch (err) {
-                console.error("ws message error:", err, data);
-            }
-        }
-
-        ws.onmessage = (e) => {
-            msgQueue.push(e.data);
-            if (!processing) {
-                processing = true;
-                (async () => {
-                    while (msgQueue.length) {
-                        await processMessage(msgQueue.shift()!);
-                    }
-                    processing = false;
-                })();
-            }
-        };
-        ws.onclose = () => {
-            peer.close();
-            localStream?.getTracks().forEach(t => t.stop());
+        setTimeout(() => {
             if (window.opener) {
                 window.close();
             } else {
-                window.location.href = "/";
+                goto("/");
             }
-        };
+        }, 100);
+    }
 
-        await new Promise<void>((resolve, reject) => {
-            if (!ws) return;
-            ws.onopen = () => resolve();
-            ws.onerror = (err) => reject(err);
-        });
-
-        let u_stream: MediaStream;
+    onMount(async () => {
         try {
-            u_stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        } catch (e) {
-            console.error("media", e);
-            return;
-        }
-        localStream = u_stream;
-
-        peer.onicecandidate = (e) => {
-            if (e.candidate) {
-                ws?.send(JSON.stringify({ type: "candidate", candidate: e.candidate.toJSON() }));
+            const url = new URL(window.location.href);
+            let id = url.searchParams.get("room_id");
+            if (id) {
+                roomId = id;
+            } else {
+                const resp = await fetch(`${API_URL}/conference/room`, { method: "POST" });
+                if (!resp.ok) throw new Error("Failed to create room: " + resp.status);
+                id = await resp.text();
+                if (!id) throw new Error("Empty room id");
+                roomId = id;
+                url.searchParams.set("room_id", id);
+                window.history.replaceState({}, "", url.toString());
             }
-        };
 
-        peer.oniceconnectionstatechange = () => {
-            if (peer.iceConnectionState === "connected" || peer.iceConnectionState === "completed") {
-                const count = 1 + (remoteStream && remoteStream.getTracks().length > 0 ? 1 : 0);
-                participants = Math.max(participants, count);
-            }
-        };
+            const ip = import.meta.env.VITE_WEBRTC_SERVER_IP;
 
-        peer.ontrack = (e) => {
-            if (e.streams && e.streams[0]) {
-                const s = e.streams[0];
-                if (s.getTracks().length > 0) {
-                    remoteStream = s;
+            peer = new RTCPeerConnection({
+                iceServers: [
+                    { urls: `stun:${ip}:3478` },
+                    {
+                        urls: [`turn:${ip}:3478`],
+                        username: "username",
+                        credential: "password",
+                    },
+                ],
+                iceTransportPolicy: "all",
+            });
+
+            const pendingIceCandidates: RTCIceCandidateInit[] = [];
+
+            ws = new WebSocket(`${WEBSOCKET_URL}/room/${roomId}`);
+
+            const msgQueue: string[] = [];
+            let processing = false;
+
+            async function processMessage(raw: string) {
+                const data = JSON.parse(raw);
+                try {
+                    if (data.type === "offer") {
+                        await peer!.setRemoteDescription(new RTCSessionDescription(data.offer));
+                        const answer = await peer!.createAnswer();
+                        await peer!.setLocalDescription(answer);
+                        ws?.send(JSON.stringify({ type: "answer", answer }));
+                        for (const c of pendingIceCandidates) {
+                            await peer!.addIceCandidate(new RTCIceCandidate(c));
+                        }
+                        pendingIceCandidates.length = 0;
+                    } else if (data.type === "answer") {
+                        await peer!.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        for (const c of pendingIceCandidates) {
+                            await peer!.addIceCandidate(new RTCIceCandidate(c));
+                        }
+                        pendingIceCandidates.length = 0;
+                    } else if (data.type === "candidate") {
+                        if (peer!.remoteDescription) {
+                            await peer!.addIceCandidate(new RTCIceCandidate(data.candidate));
+                        } else {
+                            pendingIceCandidates.push(data.candidate);
+                        }
+                    } else if (data.type === "peer_left" && data.peer_id) {
+                        removeRemoteStreamsByPeerId(data.peer_id);
+                    }
+                } catch (err) {
+                    console.error("ws message error:", err, data);
                 }
             }
-            participants = Math.max(participants, 2);
-        };
 
-        u_stream.getTracks().forEach((track) => {
-            peer.addTrack(track, u_stream);
-        });
+            ws.onmessage = (e) => {
+                msgQueue.push(e.data);
+                if (!processing) {
+                    processing = true;
+                    (async () => {
+                        while (msgQueue.length) {
+                            await processMessage(msgQueue.shift()!);
+                        }
+                        processing = false;
+                    })();
+                }
+            };
 
-        const offer = await peer.createOffer();
-        await peer.setLocalDescription(offer);
-        ws?.send(JSON.stringify({ type: "offer", offer }));
+            ws.onerror = () => {
+                console.error("WebSocket error");
+            };
+
+            ws.onclose = () => {
+                if (!callEnded) {
+                    cleanup();
+                    setTimeout(() => {
+                        if (window.opener) {
+                            window.close();
+                        } else {
+                            goto("/");
+                        }
+                    }, 100);
+                }
+            };
+
+            await new Promise<void>((resolve, reject) => {
+                if (!ws) return reject(new Error("ws not created"));
+                const onopen = () => { ws!.onopen = null; resolve(); };
+                const onerror = () => { ws!.onerror = null; reject(new Error("WebSocket connection failed")); };
+                ws.onopen = onopen;
+                ws.onerror = onerror;
+            });
+
+            let u_stream: MediaStream;
+            try {
+                u_stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            } catch (e) {
+                console.error("media", e);
+                cleanup();
+                return;
+            }
+            localStream = u_stream;
+
+            peer.onicecandidate = (e) => {
+                if (e.candidate) {
+                    ws?.send(JSON.stringify({ type: "candidate", candidate: e.candidate.toJSON() }));
+                }
+            };
+
+            peer.oniceconnectionstatechange = () => {
+                if (peer!.iceConnectionState === "connected" || peer!.iceConnectionState === "completed") {
+                    participants = Math.max(participants, remoteStreams.length + 1);
+                } else if (peer!.iceConnectionState === "failed") {
+                    iceFailed = true;
+                }
+            };
+
+            peer.ontrack = (e) => {
+                const s = e.streams?.[0];
+                if (!s) return;
+                if (!remoteStreams.find(existing => existing.id === s.id)) {
+                    remoteStreams = [...remoteStreams, s];
+                    participants = Math.max(participants, remoteStreams.length + 1);
+                }
+                s.getTracks().forEach(t => {
+                    t.onended = () => {
+                        if (!s.getVideoTracks().length && !s.getAudioTracks().length) {
+                            removeRemoteStream(s.id);
+                        }
+                    };
+                });
+            };
+
+            u_stream.getTracks().forEach((track) => {
+                peer!.addTrack(track, u_stream);
+            });
+
+            const offer = await peer.createOffer();
+            await peer.setLocalDescription(offer);
+            ws?.send(JSON.stringify({ type: "offer", offer }));
+        } catch (err) {
+            console.error("conference setup error:", err);
+            cleanup();
+        }
     });
 </script>
 
 <div class="conference">
     <div class="grid">
-        <div class="remote-container">
-            {#if remoteStream && remoteStream.getTracks().length > 0}
-                <video autoplay playsinline class="remote-video" srcObject={remoteStream}></video>
-            {:else}
-                <div class="waiting">
-                    <div class="spinner"></div>
-                    <p>Waiting for others to join...</p>
+        {#if remoteStreams.length > 0}
+            {#each remoteStreams as stream (stream.id)}
+                <div class="remote-container">
+                    <video autoplay playsinline class="remote-video" srcObject={stream}></video>
                 </div>
-            {/if}
-        </div>
+            {/each}
+        {:else}
+            <div class="remote-container">
+                <div class="waiting">
+                    {#if iceFailed}
+                        <p class="error-text">Connection failed. Please try again.</p>
+                        <button onclick={leaveCall} class="retry-btn">Leave</button>
+                    {:else}
+                        <div class="spinner"></div>
+                        <p>Waiting for others to join...</p>
+                    {/if}
+                </div>
+            </div>
+        {/if}
         <div class="local-container">
             {#if localStream}
                 <video autoplay muted class="local-video" srcObject={localStream}></video>
@@ -252,16 +319,17 @@
 
     .grid {
         flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 8px;
         padding: 24px;
         position: relative;
+        align-content: center;
     }
 
     .remote-container {
         width: 100%;
-        height: 100%;
+        aspect-ratio: 16 / 9;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -293,6 +361,26 @@
         animation: spin 0.8s linear infinite;
     }
 
+    .error-text {
+        color: #e74c3c;
+        font-size: 14px;
+        text-align: center;
+    }
+
+    .retry-btn {
+        background: #e74c3c;
+        color: #fff;
+        border: none;
+        padding: 8px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .retry-btn:hover {
+        background: #c0392b;
+    }
+
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
@@ -308,6 +396,15 @@
         background: #0f3460;
         box-shadow: 0 4px 20px rgba(0,0,0,0.4);
         border: 2px solid rgba(255,255,255,0.15);
+    }
+
+    @media (max-width: 767px) {
+        .local-container {
+            width: 120px;
+            height: 90px;
+            right: 12px;
+            bottom: 80px;
+        }
     }
 
     .local-video {
@@ -354,6 +451,19 @@
         pointer-events: auto;
     }
 
+    .room-badge {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 200px;
+    }
+
+    @media (max-width: 767px) {
+        .room-badge {
+            max-width: 120px;
+        }
+    }
+
     .controls {
         display: flex;
         align-items: center;
@@ -376,6 +486,7 @@
         background: #2a2a3e;
         color: #fff;
         -webkit-tap-highlight-color: transparent;
+        border-radius: 50%;
     }
 
     .control-btn:hover {

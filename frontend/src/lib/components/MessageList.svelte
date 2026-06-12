@@ -2,9 +2,10 @@
     import { API_URL } from "$lib/api/env";
     import { fetchMessages, sendMessage } from "$lib/api/messages";
     import { fetchTopics } from "$lib/api/topics";
+    import { fetchChat, fetchMyRole } from "$lib/api/chats";
     import { user } from "$lib/stores/user";
     import { newMessageEvent } from "$lib/stores/messages";
-    import type { Message, Topic } from "$lib/types";
+    import type { Message, Topic, Chat } from "$lib/types";
 
     const { chat_id, topic_id }: { chat_id: string, topic_id?: string } = $props();
 
@@ -19,6 +20,10 @@
     let messagesContainer: HTMLDivElement;
     let userCache: Record<string, { username: string, avatar_url?: string }> = $state({});
     let replyToMessage: Message | null = $state(null);
+    let chatType: string | null = $state(null);
+    let userRole: string | null = $state(null);
+
+    let isReadonlyChannel = $derived(chatType === "channel" && userRole !== "owner" && userRole !== "admin");
 
     $effect(() => {
         (async () => {
@@ -28,6 +33,15 @@
                 return;
             }
             messages = resp;
+
+            const chatResp = await fetchChat(chat_id);
+            if (!("error" in chatResp)) {
+                chatType = chatResp.type;
+            }
+            const roleResp = await fetchMyRole(chat_id);
+            if (!("error" in roleResp)) {
+                userRole = roleResp.role;
+            }
             const resp1 = await fetchTopics(chat_id);
             if ("error" in resp1) {
                 console.error(resp1.error);
@@ -194,37 +208,46 @@
         {#if messages.length === 0}
             <div class="empty-messages">
                 <p>No messages yet</p>
-                <p class="empty-hint">Send a message to start the conversation</p>
+                <p class="empty-hint">{isReadonlyChannel ? 'Admins will post messages here' : 'Send a message to start the conversation'}</p>
             </div>
         {/if}
     </div>
-    {#if replyToMessage}
-        <div class="reply-indicator">
-            <div class="reply-indicator-bar"></div>
-            <div class="reply-indicator-content">
-                <span class="reply-indicator-sender">{getSenderName(replyToMessage.sender_id)}</span>
-                <span class="reply-indicator-text">{replyToMessage.content || "No content"}</span>
+    {#if !isReadonlyChannel}
+        {#if replyToMessage}
+            <div class="reply-indicator">
+                <div class="reply-indicator-bar"></div>
+                <div class="reply-indicator-content">
+                    <span class="reply-indicator-sender">{getSenderName(replyToMessage.sender_id)}</span>
+                    <span class="reply-indicator-text">{replyToMessage.content || "No content"}</span>
+                </div>
+                <button type="button" class="reply-indicator-close" aria-label="Cancel reply" onclick={cancelReply}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
             </div>
-            <button type="button" class="reply-indicator-close" aria-label="Cancel reply" onclick={cancelReply}>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        {/if}
+        <form class="message-input-wrapper" onsubmit={sendMessageEvent}>
+            <input 
+                class="message-input" 
+                placeholder="Message" 
+                name="message"
+                bind:value={inputValue}
+            />
+            <button class="send-button" type="submit" aria-label="Send message">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                 </svg>
             </button>
+        </form>
+    {:else}
+        <div class="readonly-banner">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/>
+            </svg>
+            <span>Only admins can send messages in this channel</span>
         </div>
     {/if}
-    <form class="message-input-wrapper" onsubmit={sendMessageEvent}>
-        <input 
-            class="message-input" 
-            placeholder="Message" 
-            name="message"
-            bind:value={inputValue}
-        />
-        <button class="send-button" type="submit" aria-label="Send message">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
-        </button>
-    </form>
 </div>
 
 <style>
@@ -257,6 +280,15 @@
         padding: 0 0 0 60px;
     }
 
+    @media (max-width: 767px) {
+        .message-row {
+            padding: 0 16px 0 0;
+        }
+        .message-row.sent {
+            padding: 0 0 0 16px;
+        }
+    }
+
     .message-row.sent .message-bubble {
         border-top-left-radius: 18px;
         border-top-right-radius: 4px;
@@ -275,6 +307,12 @@
         border-radius: 18px;
         background: #e5f3fd;
         border-top-left-radius: 4px;
+    }
+
+    @media (max-width: 767px) {
+        .message-bubble {
+            max-width: 85%;
+        }
     }
 
     .message-bubble.received {
@@ -465,5 +503,17 @@
 
     .send-button:hover {
         background: #1c6ea8;
+    }
+
+    .readonly-banner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 14px 16px;
+        background: #f5f7f9;
+        border-top: 1px solid #e6e8eb;
+        color: #8e8e93;
+        font-size: 13px;
     }
 </style>
