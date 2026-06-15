@@ -22,7 +22,7 @@
             return navigator.serviceWorker.ready;
         }
         const registration =
-            await navigator.serviceWorker.register("/scripts/sw.js");
+            await navigator.serviceWorker.register("/sw.js");
         return registration;
     }
 

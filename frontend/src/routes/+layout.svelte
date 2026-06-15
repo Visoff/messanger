@@ -5,6 +5,6 @@
 </script>
 
 <svelte:head>
-    <title>SvelteKit</title>
+    <title>Messanger</title>
 </svelte:head>
 {@render children()}
