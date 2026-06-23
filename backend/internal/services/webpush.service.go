@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/Visoff/messanger/internal/repository"
 	"github.com/Visoff/messanger/pkgs/httperrors"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type WebPushService struct {
@@ -62,12 +64,39 @@ func (d *WebPushSubscriptionDTO) Validate() error {
 }
 
 func (s *WebPushService) SaveSubscription(ctx context.Context, subscription *WebPushSubscriptionDTO, user_id uuid.UUID) error {
-	return s.repository.CreateWebPushSubscription(ctx, &repository.CreateWebPushSubscriptionParams{
-		Endpoint: subscription.Endpoint,
-		Auth:     subscription.Keys.Auth,
-		P256dh:   subscription.Keys.P256,
-		UserID:   user_id,
-	})
+	txQ, tx, err := s.repository.NewTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	existing, err := txQ.GetSubscriptionByEndpoint(ctx, subscription.Endpoint)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		err = txQ.CreateWebPushSubscription(ctx, &repository.CreateWebPushSubscriptionParams{
+			UserID:   user_id,
+			Endpoint: subscription.Endpoint,
+			P256dh:   subscription.Keys.P256,
+			Auth:     subscription.Keys.Auth,
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		err = txQ.UpdateWebPushSubscription(ctx, &repository.UpdateWebPushSubscriptionParams{
+			ID:     existing.ID,
+			UserID: user_id,
+			P256dh: subscription.Keys.P256,
+			Auth:   subscription.Keys.Auth,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 type WebPushNotificationDTO struct {

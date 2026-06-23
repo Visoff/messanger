@@ -17,44 +17,6 @@
 
     let toast: Toast;
 
-    async function getServiceWorkerRegistration() {
-        if (navigator.serviceWorker.controller) {
-            return navigator.serviceWorker.ready;
-        }
-        const registration =
-            await navigator.serviceWorker.register("/sw.js");
-        return registration;
-    }
-
-    async function subscribeToPush() {
-        if ("serviceWorker" in navigator === false) return;
-        const registration = await getServiceWorkerRegistration();
-        const sub = await registration.pushManager.getSubscription();
-        if (sub) {
-            return;
-        }
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") return;
-
-        const vapidPublicKey = await fetch(
-            `${API_URL}/pubsub/push/pubkey`,
-        ).then((r) => r.text());
-        console.log(vapidPublicKey);
-        const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: vapidPublicKey,
-        });
-        const token = localStorage.getItem("token");
-        await fetch(`${API_URL}/pubsub/push/subscribe`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(subscription),
-        });
-    }
-
     let chat_id: string | undefined = $state(extractFromSearchParams("chat_id"));
     let chatListRefreshKey = $state(0);
     let activeCategory: { mode: string; category?: UserCategory } | null = $state(null);
@@ -112,13 +74,6 @@
             });
         }
 
-        const prompt_notifications = () => {
-            window.removeEventListener("click", prompt_notifications);
-            subscribeToPush();
-        };
-
-        window.addEventListener("click", prompt_notifications);
-
         if (token) {
             const stream = new EventSource(`${API_URL}/pubsub/sse?token=${token}`);
             stream.addEventListener("message", (e) => {
@@ -129,7 +84,9 @@
                     } else if (data.chat_id) {
                         newMessageEvent.set(data);
                     }
-                } catch {}
+                } catch {
+                    // TODO: handle
+                }
             });
         }
     });
@@ -210,7 +167,7 @@
     <div class="md:w-80 md:relative min-w-80 border-r-gray-100 border-r flex flex-col bg-white w-full absolute md:flex {isMobile && showChatPanel ? 'hidden' : ''}">
         <div class="flex justify-between items-center p-4 border-b-gray-100 border-b">
             <div class="flex items-center gap-2">
-                <button onclick={() => accountMenu?.open()} class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-xs overflow-hidden hover:opacity-80 transition-opacity" title="Account">
+                <button onclick={() => accountMenu?.open()} class="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-xs overflow-hidden hover:opacity-80 transition-opacity" title="Account">
                     {#if $user?.avatar_url}
                         <img src={$user.avatar_url} alt="avatar" class="w-full h-full object-cover" />
                     {:else}
