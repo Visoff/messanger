@@ -35,6 +35,20 @@ func (c *InvitationController) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	c.mux.ServeHTTP(w, r)
 }
 
+// GetInvitationInfo returns information about an invitation.
+// @Summary      Get invitation info
+// @Description  Returns information about a chat invitation by its ID.
+// @Tags         invitations
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Invitation ID"
+// @Success      200  {object}  services.InvitationInfo
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      404  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /invitation/{id}/info [get]
+// @Security     BearerAuth
 func (c *InvitationController) GetInvitationInfo(w http.ResponseWriter, r *http.Request) error {
 	invitation_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -52,6 +66,19 @@ func (c *InvitationController) GetInvitationInfo(w http.ResponseWriter, r *http.
 	return nil
 }
 
+// AcceptInvitationJson accepts a chat invitation.
+// @Summary      Accept invitation
+// @Description  Accept a chat invitation and join the chat.
+// @Tags         invitations
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Invitation ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /invitation/{id}/accept [post]
+// @Security     BearerAuth
 func (c *InvitationController) AcceptInvitationJson(w http.ResponseWriter, r *http.Request) error {
 	invitation_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -69,6 +96,19 @@ func (c *InvitationController) AcceptInvitationJson(w http.ResponseWriter, r *ht
 	return nil
 }
 
+// RejectInvitation rejects (deletes) a chat invitation.
+// @Summary      Reject invitation
+// @Description  Reject or delete a chat invitation.
+// @Tags         invitations
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Invitation ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /invitation/{id} [delete]
+// @Security     BearerAuth
 func (c *InvitationController) RejectInvitation(w http.ResponseWriter, r *http.Request) error {
 	invitation_id, err := handlers.GetParamID(r, "id")
 	if err != nil {

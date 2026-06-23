@@ -24,6 +24,230 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/categories/": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all user categories with their chat IDs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "List categories",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/services.UserCategoryResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new user category with a name and optional chat IDs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Create category",
+                "parameters": [
+                    {
+                        "description": "Category details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.CreateCategoryDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.UserCategoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/categories/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update a user category's name and chat IDs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Update category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Category details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.UpdateCategoryDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.UserCategoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a user category by ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Delete category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/chats/": {
             "get": {
                 "security": [
@@ -71,14 +295,16 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/chats/channel": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new chat (private, group, or channel). The authenticated user becomes the owner.",
+                "description": "Create a new channel. The authenticated user becomes the owner.",
                 "consumes": [
                     "application/json"
                 ],
@@ -88,7 +314,64 @@ const docTemplate = `{
                 "tags": [
                     "chats"
                 ],
-                "summary": "Create a chat",
+                "summary": "Create a channel",
+                "parameters": [
+                    {
+                        "description": "Channel details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.CreateChatDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.Chat"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/chats/group": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new group chat. The authenticated user becomes the owner.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Create a group chat",
                 "parameters": [
                     {
                         "description": "Chat details",
@@ -128,6 +411,67 @@ const docTemplate = `{
                 }
             }
         },
+        "/chats/private": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new private (1-on-1) chat with another user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Create private chat",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The other user's ID",
+                        "name": "user_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.Chat"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/chats/{id}": {
             "get": {
                 "security": [
@@ -148,7 +492,7 @@ const docTemplate = `{
                 "summary": "Get a chat by ID",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Chat ID",
                         "name": "id",
                         "in": "path",
@@ -160,6 +504,359 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/repository.Chat"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update a chat's title and metadata.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Update chat",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Chat details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.UpdateChatDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.Chat"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/chats/{id}/avatar": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload an avatar image for a chat.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Upload chat avatar",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.Chat"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/chats/{id}/invitation": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create an invitation link for a chat. Returns the invitation ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Create invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.InvitationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/chats/{id}/invite/{user_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Add a user directly to a chat by user ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Invite user to chat",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/chats/{id}/leave": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove the authenticated user from a chat.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Leave chat",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/chats/{id}/members": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all members of a chat.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "List chat members",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/repository.User"
+                            }
                         }
                     },
                     "400": {
@@ -203,7 +900,7 @@ const docTemplate = `{
                 "summary": "List all messages in a chat",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Chat ID",
                         "name": "id",
                         "in": "path",
@@ -259,7 +956,7 @@ const docTemplate = `{
                 "summary": "Create a new message in a chat",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Chat ID",
                         "name": "id",
                         "in": "path",
@@ -303,6 +1000,128 @@ const docTemplate = `{
                 }
             }
         },
+        "/chats/{id}/mute": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mute or unmute notifications for a chat.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Mute/unmute chat",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Mute status",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.MuteChatDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.Chat"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/chats/{id}/my-role": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the role of the authenticated user in a chat.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Get my role in chat",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/chats/{id}/topics": {
             "get": {
                 "security": [
@@ -323,7 +1142,7 @@ const docTemplate = `{
                 "summary": "List all topics in a chat",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Chat ID",
                         "name": "id",
                         "in": "path",
@@ -379,7 +1198,7 @@ const docTemplate = `{
                 "summary": "Create a new topic in a chat",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Chat ID",
                         "name": "id",
                         "in": "path",
@@ -423,6 +1242,346 @@ const docTemplate = `{
                 }
             }
         },
+        "/invitation/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Reject or delete a chat invitation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invitations"
+                ],
+                "summary": "Reject invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invitation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/invitation/{id}/accept": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Accept a chat invitation and join the chat.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invitations"
+                ],
+                "summary": "Accept invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invitation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/invitation/{id}/info": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns information about a chat invitation by its ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invitations"
+                ],
+                "summary": "Get invitation info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invitation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.InvitationInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pubsub/push/notify": {
+            "post": {
+                "description": "Send a push notification to all subscribed users.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pubsub"
+                ],
+                "summary": "Send push notification",
+                "parameters": [
+                    {
+                        "description": "Notification details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.WebPushNotificationDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pubsub/push/pubkey": {
+            "get": {
+                "description": "Returns the VAPID public key needed for Web Push subscription.",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "pubsub"
+                ],
+                "summary": "Get VAPID public key",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pubsub/push/subscribe": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Save a Web Push subscription for the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pubsub"
+                ],
+                "summary": "Subscribe to push notifications",
+                "parameters": [
+                    {
+                        "description": "Push subscription details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.WebPushSubscriptionDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pubsub/sse": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Subscribe to Server-Sent Events for real-time chat updates.",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "pubsub"
+                ],
+                "summary": "SSE stream",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/topics/{id}": {
             "get": {
                 "security": [
@@ -443,7 +1602,7 @@ const docTemplate = `{
                 "summary": "Get a topic by ID",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Topic ID",
                         "name": "id",
                         "in": "path",
@@ -498,7 +1657,7 @@ const docTemplate = `{
                 "summary": "List all messages in a topic",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Topic ID",
                         "name": "id",
                         "in": "path",
@@ -554,7 +1713,7 @@ const docTemplate = `{
                 "summary": "Create a new message in a topic",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Topic ID",
                         "name": "id",
                         "in": "path",
@@ -613,7 +1772,7 @@ const docTemplate = `{
                 "summary": "Get user by ID",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "User ID",
                         "name": "id",
                         "in": "path",
@@ -702,6 +1861,11 @@ const docTemplate = `{
         },
         "/users/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get the current user.",
                 "consumes": [
                     "application/json"
@@ -783,6 +1947,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/avatar": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload an avatar image for the current user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Upload avatar",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.DisplayUser"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/httperrors.ErrorResponse"
                         }
@@ -894,6 +2104,14 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "controllers.MuteChatDTO": {
+            "type": "object",
+            "properties": {
+                "muted": {
+                    "type": "boolean"
+                }
+            }
+        },
         "httperrors.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -958,6 +2176,29 @@ const docTemplate = `{
                 "ChatTypeGroup",
                 "ChatTypeChannel"
             ]
+        },
+        "repository.Invitation": {
+            "type": "object",
+            "properties": {
+                "chat_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
         },
         "repository.Message": {
             "type": "object",
@@ -1031,6 +2272,41 @@ const docTemplate = `{
                 "TopicTypeVoiceTopic"
             ]
         },
+        "repository.User": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_seen_at": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "password_hash": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "services.AccessToken": {
             "type": "object",
             "properties": {
@@ -1070,6 +2346,20 @@ const docTemplate = `{
                     "$ref": "#/definitions/repository.ChatType"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.CreateCategoryDTO": {
+            "type": "object",
+            "properties": {
+                "chat_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
                     "type": "string"
                 }
             }
@@ -1144,6 +2434,28 @@ const docTemplate = `{
                 }
             }
         },
+        "services.InvitationInfo": {
+            "type": "object",
+            "properties": {
+                "chat": {
+                    "$ref": "#/definitions/repository.Chat"
+                },
+                "creator": {
+                    "$ref": "#/definitions/repository.User"
+                },
+                "invitation": {
+                    "$ref": "#/definitions/repository.Invitation"
+                }
+            }
+        },
+        "services.InvitationResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "services.LoginUserDTO": {
             "type": "object",
             "properties": {
@@ -1166,6 +2478,23 @@ const docTemplate = `{
                 }
             }
         },
+        "services.UpdateCategoryDTO": {
+            "type": "object",
+            "properties": {
+                "chat_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.UpdateChatDTO": {
+            "type": "object"
+        },
         "services.UpdateUserDTO": {
             "type": "object",
             "properties": {
@@ -1177,6 +2506,62 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "services.UserCategoryResponse": {
+            "type": "object",
+            "properties": {
+                "chat_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.WebPushNotificationDTO": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.WebPushSubscriptionDTO": {
+            "type": "object",
+            "properties": {
+                "endpoint": {
+                    "type": "string"
+                },
+                "keys": {
+                    "type": "object",
+                    "properties": {
+                        "auth": {
+                            "type": "string"
+                        },
+                        "p256dh": {
+                            "type": "string"
+                        }
+                    }
                 }
             }
         }

@@ -50,7 +50,7 @@ func (c *TopicController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // @Tags         messages
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "Topic ID"
+// @Param        id path string true "Topic ID"
 // @Success      200  {object}  []repository.Message
 // @Failure      400  {object}  httperrors.ErrorResponse
 // @Failure      401  {object}  httperrors.ErrorResponse
@@ -77,7 +77,7 @@ func (c *TopicController) ListMessages(w http.ResponseWriter, r *http.Request) e
 // @Tags         messages
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "Topic ID"
+// @Param        id path string true "Topic ID"
 // @Param        request body services.CreateMessageDTO true "Message details"
 // @Success      200  {object}  repository.Message
 // @Failure      400  {object}  httperrors.ErrorResponse
@@ -122,7 +122,7 @@ func (c *TopicController) CreateMessage(w http.ResponseWriter, r *http.Request) 
 // @Tags         topics
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "Topic ID"
+// @Param        id path string true "Topic ID"
 // @Success      200  {object}  repository.Topic
 // @Failure      400  {object}  httperrors.ErrorResponse
 // @Failure      401  {object}  httperrors.ErrorResponse

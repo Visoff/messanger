@@ -35,6 +35,18 @@ func (c *CategoryController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.mux.ServeHTTP(w, r)
 }
 
+// ListCategories returns all categories for the authenticated user.
+// @Summary      List categories
+// @Description  Returns all user categories with their chat IDs.
+// @Tags         categories
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  []services.UserCategoryResponse
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /categories/ [get]
+// @Security     BearerAuth
 func (c *CategoryController) ListCategories(w http.ResponseWriter, r *http.Request) error {
 	categories, err := c.categoryService.ListCategories(r.Context())
 	if err != nil {
@@ -45,6 +57,19 @@ func (c *CategoryController) ListCategories(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
+// CreateCategory creates a new category for the authenticated user.
+// @Summary      Create category
+// @Description  Create a new user category with a name and optional chat IDs.
+// @Tags         categories
+// @Accept       json
+// @Produce      json
+// @Param        request body services.CreateCategoryDTO true "Category details"
+// @Success      200  {object}  services.UserCategoryResponse
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /categories/ [post]
+// @Security     BearerAuth
 func (c *CategoryController) CreateCategory(w http.ResponseWriter, r *http.Request) error {
 	var dto services.CreateCategoryDTO
 	if err := dtos.ParseFromBody(r, &dto); err != nil {
@@ -59,6 +84,20 @@ func (c *CategoryController) CreateCategory(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
+// UpdateCategory updates an existing category.
+// @Summary      Update category
+// @Description  Update a user category's name and chat IDs.
+// @Tags         categories
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Category ID"
+// @Param        request body services.UpdateCategoryDTO true "Category details"
+// @Success      200  {object}  services.UserCategoryResponse
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /categories/{id} [put]
+// @Security     BearerAuth
 func (c *CategoryController) UpdateCategory(w http.ResponseWriter, r *http.Request) error {
 	id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -77,6 +116,19 @@ func (c *CategoryController) UpdateCategory(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
+// DeleteCategory deletes a category.
+// @Summary      Delete category
+// @Description  Delete a user category by ID.
+// @Tags         categories
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Category ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /categories/{id} [delete]
+// @Security     BearerAuth
 func (c *CategoryController) DeleteCategory(w http.ResponseWriter, r *http.Request) error {
 	id, err := handlers.GetParamID(r, "id")
 	if err != nil {

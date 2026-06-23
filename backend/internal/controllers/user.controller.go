@@ -122,6 +122,7 @@ func (c *UserController) LoginUser(w http.ResponseWriter, r *http.Request) error
 // @Failure      401  {object}  httperrors.ErrorResponse
 // @Failure      500  {object}  httperrors.ErrorResponse
 // @Router       /users/me [get]
+// @Security     BearerAuth
 func (c *UserController) GetMe(w http.ResponseWriter, r *http.Request) error {
 	user, err := c.userService.GetMe(r)
 	if err != nil {
@@ -185,6 +186,18 @@ func (c *UserController) GetUserByUsername(w http.ResponseWriter, r *http.Reques
 	return nil
 }
 
+// UploadMyAvatar uploads an avatar for the current user.
+// @Summary      Upload avatar
+// @Description  Upload an avatar image for the current user.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  services.DisplayUser
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /users/me/avatar [post]
+// @Security     BearerAuth
 func (c *UserController) UploadMyAvatar(w http.ResponseWriter, r *http.Request) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 
@@ -252,7 +265,7 @@ func (c *UserController) uploadToFileStorage(data []byte) (string, error) {
 // @Tags         users
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "User ID"
+// @Param        id path string true "User ID"
 // @Success      200  {object}  services.DisplayUser
 // @Failure      400  {object}  httperrors.ErrorResponse
 // @Failure      401  {object}  httperrors.ErrorResponse

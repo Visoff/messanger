@@ -96,9 +96,9 @@ func (c *ChatController) ListChats(w http.ResponseWriter, r *http.Request) error
 	return nil
 }
 
-// CreateChat creates a new chat and adds the authenticated user as owner.
-// @Summary      Create a chat
-// @Description  Create a new chat (private, group, or channel). The authenticated user becomes the owner.
+// CreateChat creates a new group chat and adds the authenticated user as owner.
+// @Summary      Create a group chat
+// @Description  Create a new group chat. The authenticated user becomes the owner.
 // @Tags         chats
 // @Accept       json
 // @Produce      json
@@ -107,7 +107,7 @@ func (c *ChatController) ListChats(w http.ResponseWriter, r *http.Request) error
 // @Failure      400  {object}  httperrors.ErrorResponse
 // @Failure      401  {object}  httperrors.ErrorResponse
 // @Failure      500  {object}  httperrors.ErrorResponse
-// @Router       /chats/ [post]
+// @Router       /chats/group [post]
 // @Security     BearerAuth
 func (c *ChatController) CreateChat(w http.ResponseWriter, r *http.Request) error {
 	var dto services.CreateChatDTO
@@ -131,6 +131,19 @@ func (c *ChatController) CreateChat(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// CreateChannel creates a new channel and adds the authenticated user as owner.
+// @Summary      Create a channel
+// @Description  Create a new channel. The authenticated user becomes the owner.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        request body services.CreateChatDTO true "Channel details"
+// @Success      200  {object}  repository.Chat
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/channel [post]
+// @Security     BearerAuth
 func (c *ChatController) CreateChannel(w http.ResponseWriter, r *http.Request) error {
 	var dto services.CreateChatDTO
 
@@ -159,7 +172,7 @@ func (c *ChatController) CreateChannel(w http.ResponseWriter, r *http.Request) e
 // @Tags         topics
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "Chat ID"
+// @Param        id path string true "Chat ID"
 // @Success      200  {object}  []repository.Topic
 // @Failure      400  {object}  httperrors.ErrorResponse
 // @Failure      401  {object}  httperrors.ErrorResponse
@@ -186,7 +199,7 @@ func (c *ChatController) ListTopics(w http.ResponseWriter, r *http.Request) erro
 // @Tags         messages
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "Chat ID"
+// @Param        id path string true "Chat ID"
 // @Success      200  {object}  []repository.Message
 // @Failure      400  {object}  httperrors.ErrorResponse
 // @Failure      401  {object}  httperrors.ErrorResponse
@@ -213,7 +226,7 @@ func (c *ChatController) ListMessages(w http.ResponseWriter, r *http.Request) er
 // @Tags         chats
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "Chat ID"
+// @Param        id path string true "Chat ID"
 // @Success      200  {object}  repository.Chat
 // @Failure      400  {object}  httperrors.ErrorResponse
 // @Failure      401  {object}  httperrors.ErrorResponse
@@ -240,7 +253,7 @@ func (c *ChatController) GetChat(w http.ResponseWriter, r *http.Request) error {
 // @Tags         topics
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "Chat ID"
+// @Param        id path string true "Chat ID"
 // @Param        request body services.CreateTopicDTO true "Topic details"
 // @Success      200  {object}  repository.Topic
 // @Failure      400  {object}  httperrors.ErrorResponse
@@ -272,7 +285,7 @@ func (c *ChatController) CreateTopic(w http.ResponseWriter, r *http.Request) err
 // @Tags         messages
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "Chat ID"
+// @Param        id path string true "Chat ID"
 // @Param        request body services.CreateMessageDTO true "Message details"
 // @Success      200  {object}  repository.Message
 // @Failure      400  {object}  httperrors.ErrorResponse
@@ -311,6 +324,19 @@ func (c *ChatController) CreateMessage(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+// CreateInvitation creates an invitation link for a chat.
+// @Summary      Create invitation
+// @Description  Create an invitation link for a chat. Returns the invitation ID.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Chat ID"
+// @Success      200  {object}  services.InvitationResponse
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/invitation [post]
+// @Security     BearerAuth
 func (c *ChatController) CreateInvitation(w http.ResponseWriter, r *http.Request) error {
 	chat_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -326,6 +352,20 @@ func (c *ChatController) CreateInvitation(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
+// InviteUser adds a user to a chat directly.
+// @Summary      Invite user to chat
+// @Description  Add a user directly to a chat by user ID.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Chat ID"
+// @Param        user_id path string true "User ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/invite/{user_id} [post]
+// @Security     BearerAuth
 func (c *ChatController) InviteUser(w http.ResponseWriter, r *http.Request) error {
 	chat_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -351,6 +391,20 @@ func (c *ChatController) InviteUser(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// CreatePrivateChat creates a new private chat with another user.
+// @Summary      Create private chat
+// @Description  Create a new private (1-on-1) chat with another user.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        user_id query string true "The other user's ID"
+// @Success      200  {object}  repository.Chat
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      409  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/private [post]
+// @Security     BearerAuth
 func (c *ChatController) CreatePrivateChat(w http.ResponseWriter, r *http.Request) error {
 	user1_id, err := services.ExtractUserId(r.Context())
 	if err != nil {
@@ -369,6 +423,20 @@ func (c *ChatController) CreatePrivateChat(w http.ResponseWriter, r *http.Reques
 	return nil
 }
 
+// UpdateChat updates a chat's details.
+// @Summary      Update chat
+// @Description  Update a chat's title and metadata.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Chat ID"
+// @Param        request body services.UpdateChatDTO true "Chat details"
+// @Success      200  {object}  repository.Chat
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id} [put]
+// @Security     BearerAuth
 func (c *ChatController) UpdateChat(w http.ResponseWriter, r *http.Request) error {
 	chat_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -387,6 +455,19 @@ func (c *ChatController) UpdateChat(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// LeaveChat removes the authenticated user from a chat.
+// @Summary      Leave chat
+// @Description  Remove the authenticated user from a chat.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Chat ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/leave [post]
+// @Security     BearerAuth
 func (c *ChatController) LeaveChat(w http.ResponseWriter, r *http.Request) error {
 	chat_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -409,6 +490,20 @@ func (d *MuteChatDTO) Validate() error {
 	return nil
 }
 
+// MuteChat toggles mute status for a chat.
+// @Summary      Mute/unmute chat
+// @Description  Mute or unmute notifications for a chat.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Chat ID"
+// @Param        request body MuteChatDTO true "Mute status"
+// @Success      200  {object}  repository.Chat
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/mute [put]
+// @Security     BearerAuth
 func (c *ChatController) MuteChat(w http.ResponseWriter, r *http.Request) error {
 	chat_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -427,6 +522,19 @@ func (c *ChatController) MuteChat(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// UploadChatAvatar uploads an avatar for a chat.
+// @Summary      Upload chat avatar
+// @Description  Upload an avatar image for a chat.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Chat ID"
+// @Success      200  {object}  repository.Chat
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/avatar [post]
+// @Security     BearerAuth
 func (c *ChatController) UploadChatAvatar(w http.ResponseWriter, r *http.Request) error {
 	chat_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -493,6 +601,19 @@ func (c *ChatController) uploadToFileStorage(data []byte) (string, error) {
 	return result.UUID, nil
 }
 
+// ListChatMembers returns all members of a chat.
+// @Summary      List chat members
+// @Description  Returns all members of a chat.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Chat ID"
+// @Success      200  {object}  []repository.User
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/members [get]
+// @Security     BearerAuth
 func (c *ChatController) ListChatMembers(w http.ResponseWriter, r *http.Request) error {
 	chat_id, err := handlers.GetParamID(r, "id")
 	if err != nil {
@@ -507,6 +628,19 @@ func (c *ChatController) ListChatMembers(w http.ResponseWriter, r *http.Request)
 	return nil
 }
 
+// GetMyRole returns the authenticated user's role in a chat.
+// @Summary      Get my role in chat
+// @Description  Returns the role of the authenticated user in a chat.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Chat ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /chats/{id}/my-role [get]
+// @Security     BearerAuth
 func (c *ChatController) GetMyRole(w http.ResponseWriter, r *http.Request) error {
 	chat_id, err := handlers.GetParamID(r, "id")
 	if err != nil {

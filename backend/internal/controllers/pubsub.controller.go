@@ -37,6 +37,17 @@ func (c *PubSubController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.mux.ServeHTTP(w, r)
 }
 
+// SSE subscribes to Server-Sent Events for real-time updates.
+// @Summary      SSE stream
+// @Description  Subscribe to Server-Sent Events for real-time chat updates.
+// @Tags         pubsub
+// @Produce      text/event-stream
+// @Success      200
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /pubsub/sse [get]
+// @Security     BearerAuth
 func (c *PubSubController) SSE(w http.ResponseWriter, r *http.Request) error {
 	user_id, err := services.ExtractUserId(r.Context())
 	if err != nil {
@@ -77,6 +88,14 @@ func (c *PubSubController) SSE(w http.ResponseWriter, r *http.Request) error {
 	}
 }
 
+// GetPushPubKey returns the VAPID public key for Web Push.
+// @Summary      Get VAPID public key
+// @Description  Returns the VAPID public key needed for Web Push subscription.
+// @Tags         pubsub
+// @Produce      plain
+// @Success      200  {string}  string
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /pubsub/push/pubkey [get]
 func (c *PubSubController) GetPushPubKey(w http.ResponseWriter, r *http.Request) error {
 	key := c.webpushService.GetVapidPublicKey()
 
@@ -85,6 +104,19 @@ func (c *PubSubController) GetPushPubKey(w http.ResponseWriter, r *http.Request)
 	return nil
 }
 
+// SubscribePush subscribes the authenticated user to Web Push notifications.
+// @Summary      Subscribe to push notifications
+// @Description  Save a Web Push subscription for the authenticated user.
+// @Tags         pubsub
+// @Accept       json
+// @Produce      json
+// @Param        request body services.WebPushSubscriptionDTO true "Push subscription details"
+// @Success      200
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      401  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /pubsub/push/subscribe [post]
+// @Security     BearerAuth
 func (c *PubSubController) SubscribePush(w http.ResponseWriter, r *http.Request) error {
 	user_id, err := services.ExtractUserId(r.Context())
 	if err != nil {
@@ -101,6 +133,17 @@ func (c *PubSubController) SubscribePush(w http.ResponseWriter, r *http.Request)
 	return nil
 }
 
+// NotifyPush sends a push notification to all subscribers.
+// @Summary      Send push notification
+// @Description  Send a push notification to all subscribed users.
+// @Tags         pubsub
+// @Accept       json
+// @Produce      json
+// @Param        request body services.WebPushNotificationDTO true "Notification details"
+// @Success      200
+// @Failure      400  {object}  httperrors.ErrorResponse
+// @Failure      500  {object}  httperrors.ErrorResponse
+// @Router       /pubsub/push/notify [post]
 func (c *PubSubController) NotifyPush(w http.ResponseWriter, r *http.Request) error {
 	var dto services.WebPushNotificationDTO
 	if err := dtos.ParseFromBody(r, &dto); err != nil {

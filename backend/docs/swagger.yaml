@@ -1,5 +1,10 @@
 basePath: /
 definitions:
+  controllers.MuteChatDTO:
+    properties:
+      muted:
+        type: boolean
+    type: object
   httperrors.ErrorResponse:
     properties:
       details:
@@ -44,6 +49,21 @@ definitions:
     - ChatTypePrivate
     - ChatTypeGroup
     - ChatTypeChannel
+  repository.Invitation:
+    properties:
+      chat_id:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      id:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   repository.Message:
     properties:
       chat_id:
@@ -92,6 +112,29 @@ definitions:
     x-enum-varnames:
     - TopicTypeTextTopic
     - TopicTypeVoiceTopic
+  repository.User:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      id:
+        type: string
+      last_seen_at:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      password_hash:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
   services.AccessToken:
     properties:
       token:
@@ -118,6 +161,15 @@ definitions:
       type:
         $ref: '#/definitions/repository.ChatType'
       updated_at:
+        type: string
+    type: object
+  services.CreateCategoryDTO:
+    properties:
+      chat_ids:
+        items:
+          type: string
+        type: array
+      name:
         type: string
     type: object
   services.CreateChatDTO:
@@ -167,6 +219,20 @@ definitions:
       username:
         type: string
     type: object
+  services.InvitationInfo:
+    properties:
+      chat:
+        $ref: '#/definitions/repository.Chat'
+      creator:
+        $ref: '#/definitions/repository.User'
+      invitation:
+        $ref: '#/definitions/repository.Invitation'
+    type: object
+  services.InvitationResponse:
+    properties:
+      id:
+        type: string
+    type: object
   services.LoginUserDTO:
     properties:
       password:
@@ -181,6 +247,17 @@ definitions:
       username:
         type: string
     type: object
+  services.UpdateCategoryDTO:
+    properties:
+      chat_ids:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+    type: object
+  services.UpdateChatDTO:
+    type: object
   services.UpdateUserDTO:
     properties:
       avatar_url:
@@ -189,6 +266,42 @@ definitions:
         type: string
       username:
         type: string
+    type: object
+  services.UserCategoryResponse:
+    properties:
+      chat_ids:
+        items:
+          type: string
+        type: array
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  services.WebPushNotificationDTO:
+    properties:
+      body:
+        type: string
+      title:
+        type: string
+    type: object
+  services.WebPushSubscriptionDTO:
+    properties:
+      endpoint:
+        type: string
+      keys:
+        properties:
+          auth:
+            type: string
+          p256dh:
+            type: string
+        type: object
     type: object
 host: localhost:8080
 info:
@@ -204,6 +317,149 @@ info:
   title: Messenger API
   version: "1.0"
 paths:
+  /categories/:
+    get:
+      consumes:
+      - application/json
+      description: Returns all user categories with their chat IDs.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/services.UserCategoryResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List categories
+      tags:
+      - categories
+    post:
+      consumes:
+      - application/json
+      description: Create a new user category with a name and optional chat IDs.
+      parameters:
+      - description: Category details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateCategoryDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.UserCategoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create category
+      tags:
+      - categories
+  /categories/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a user category by ID.
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete category
+      tags:
+      - categories
+    put:
+      consumes:
+      - application/json
+      description: Update a user category's name and chat IDs.
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.UpdateCategoryDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.UserCategoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update category
+      tags:
+      - categories
   /chats/:
     get:
       consumes:
@@ -235,42 +491,6 @@ paths:
       summary: List all chats
       tags:
       - chats
-    post:
-      consumes:
-      - application/json
-      description: Create a new chat (private, group, or channel). The authenticated
-        user becomes the owner.
-      parameters:
-      - description: Chat details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/services.CreateChatDTO'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/repository.Chat'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/httperrors.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/httperrors.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/httperrors.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Create a chat
-      tags:
-      - chats
   /chats/{id}:
     get:
       consumes:
@@ -281,7 +501,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -306,6 +526,232 @@ paths:
       summary: Get a chat by ID
       tags:
       - chats
+    put:
+      consumes:
+      - application/json
+      description: Update a chat's title and metadata.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Chat details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.UpdateChatDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Chat'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update chat
+      tags:
+      - chats
+  /chats/{id}/avatar:
+    post:
+      consumes:
+      - application/json
+      description: Upload an avatar image for a chat.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Chat'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload chat avatar
+      tags:
+      - chats
+  /chats/{id}/invitation:
+    post:
+      consumes:
+      - application/json
+      description: Create an invitation link for a chat. Returns the invitation ID.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.InvitationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create invitation
+      tags:
+      - chats
+  /chats/{id}/invite/{user_id}:
+    post:
+      consumes:
+      - application/json
+      description: Add a user directly to a chat by user ID.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Invite user to chat
+      tags:
+      - chats
+  /chats/{id}/leave:
+    post:
+      consumes:
+      - application/json
+      description: Remove the authenticated user from a chat.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Leave chat
+      tags:
+      - chats
+  /chats/{id}/members:
+    get:
+      consumes:
+      - application/json
+      description: Returns all members of a chat.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/repository.User'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List chat members
+      tags:
+      - chats
   /chats/{id}/messages:
     get:
       consumes:
@@ -316,7 +762,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -352,7 +798,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - description: Message details
         in: body
         name: request
@@ -383,6 +829,84 @@ paths:
       summary: Create a new message in a chat
       tags:
       - messages
+  /chats/{id}/mute:
+    put:
+      consumes:
+      - application/json
+      description: Mute or unmute notifications for a chat.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Mute status
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.MuteChatDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Chat'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mute/unmute chat
+      tags:
+      - chats
+  /chats/{id}/my-role:
+    get:
+      consumes:
+      - application/json
+      description: Returns the role of the authenticated user in a chat.
+      parameters:
+      - description: Chat ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my role in chat
+      tags:
+      - chats
   /chats/{id}/topics:
     get:
       consumes:
@@ -393,7 +917,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -429,7 +953,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - description: Topic details
         in: body
         name: request
@@ -460,6 +984,334 @@ paths:
       summary: Create a new topic in a chat
       tags:
       - topics
+  /chats/channel:
+    post:
+      consumes:
+      - application/json
+      description: Create a new channel. The authenticated user becomes the owner.
+      parameters:
+      - description: Channel details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateChatDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Chat'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a channel
+      tags:
+      - chats
+  /chats/group:
+    post:
+      consumes:
+      - application/json
+      description: Create a new group chat. The authenticated user becomes the owner.
+      parameters:
+      - description: Chat details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateChatDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Chat'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a group chat
+      tags:
+      - chats
+  /chats/private:
+    post:
+      consumes:
+      - application/json
+      description: Create a new private (1-on-1) chat with another user.
+      parameters:
+      - description: The other user's ID
+        in: query
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.Chat'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create private chat
+      tags:
+      - chats
+  /invitation/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Reject or delete a chat invitation.
+      parameters:
+      - description: Invitation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject invitation
+      tags:
+      - invitations
+  /invitation/{id}/accept:
+    post:
+      consumes:
+      - application/json
+      description: Accept a chat invitation and join the chat.
+      parameters:
+      - description: Invitation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Accept invitation
+      tags:
+      - invitations
+  /invitation/{id}/info:
+    get:
+      consumes:
+      - application/json
+      description: Returns information about a chat invitation by its ID.
+      parameters:
+      - description: Invitation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.InvitationInfo'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get invitation info
+      tags:
+      - invitations
+  /pubsub/push/notify:
+    post:
+      consumes:
+      - application/json
+      description: Send a push notification to all subscribed users.
+      parameters:
+      - description: Notification details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.WebPushNotificationDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      summary: Send push notification
+      tags:
+      - pubsub
+  /pubsub/push/pubkey:
+    get:
+      description: Returns the VAPID public key needed for Web Push subscription.
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      summary: Get VAPID public key
+      tags:
+      - pubsub
+  /pubsub/push/subscribe:
+    post:
+      consumes:
+      - application/json
+      description: Save a Web Push subscription for the authenticated user.
+      parameters:
+      - description: Push subscription details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.WebPushSubscriptionDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Subscribe to push notifications
+      tags:
+      - pubsub
+  /pubsub/sse:
+    get:
+      description: Subscribe to Server-Sent Events for real-time chat updates.
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: SSE stream
+      tags:
+      - pubsub
   /topics/{id}:
     get:
       consumes:
@@ -470,7 +1322,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -505,7 +1357,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -541,7 +1393,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - description: Message details
         in: body
         name: request
@@ -582,7 +1434,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -663,6 +1515,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Get current user
       tags:
       - users
@@ -695,6 +1549,35 @@ paths:
       security:
       - BearerAuth: []
       summary: Update current user
+      tags:
+      - users
+  /users/me/avatar:
+    post:
+      consumes:
+      - application/json
+      description: Upload an avatar image for the current user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.DisplayUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httperrors.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload avatar
       tags:
       - users
   /users/register:
