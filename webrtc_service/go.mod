@@ -3,16 +3,15 @@ module github.com/Visoff/messanger/webrtc_service
 go 1.26.1
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
 	github.com/pion/interceptor v0.1.44
-	github.com/pion/stun/v3 v3.1.2
 	github.com/pion/turn/v5 v5.0.3
 	github.com/pion/webrtc/v4 v4.2.11
 )
 
 require (
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/pion/datachannel v1.6.0 // indirect
 	github.com/pion/dtls/v3 v3.1.2 // indirect
 	github.com/pion/ice/v4 v4.2.2 // indirect
@@ -24,6 +23,7 @@ require (
 	github.com/pion/sctp v1.9.4 // indirect
 	github.com/pion/sdp/v3 v3.0.18 // indirect
 	github.com/pion/srtp/v3 v3.0.10 // indirect
+	github.com/pion/stun/v3 v3.1.2 // indirect
 	github.com/pion/transport/v4 v4.0.1 // indirect
 	github.com/pion/turn/v4 v4.1.4 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
