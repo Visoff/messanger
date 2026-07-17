@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/Visoff/messanger/docs"
 	"github.com/Visoff/messanger/internal/controllers"
@@ -112,6 +114,12 @@ func main() {
 		httpswagger.URL("http://localhost:8080/docs/swagger.json"),
 	))
 
+	staticDir := os.Getenv("STATIC_DIR")
+	if staticDir == "" {
+		staticDir = "../frontend/build"
+	}
+	mux.Handle("/", spaFileServer(staticDir))
+
 	log.Println("Server is running on port 8080")
 	err = http.ListenAndServe(":8080", handlers.MiddlewareChain(
 		handlers.Logging(log.Default()),
@@ -121,4 +129,32 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func spaFileServer(dir string) http.Handler {
+	fs := http.FileServer(http.Dir(dir))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clean := path.Clean(r.URL.Path)
+		if clean == "/" || clean == "" {
+			http.ServeFile(w, r, dir+"/index.html")
+			return
+		}
+		if strings.HasPrefix(clean, "/_app/") || strings.HasPrefix(clean, "/favicon") ||
+			strings.HasPrefix(clean, "/icons") || strings.HasPrefix(clean, "/manifest") ||
+			strings.HasPrefix(clean, "/robots") || strings.HasPrefix(clean, "/sw") {
+			fs.ServeHTTP(w, r)
+			return
+		}
+		ext := path.Ext(clean)
+		if ext != "" {
+			fs.ServeHTTP(w, r)
+			return
+		}
+		htmlPath := dir + clean + ".html"
+		if _, err := os.Stat(htmlPath); err == nil {
+			http.ServeFile(w, r, htmlPath)
+			return
+		}
+		http.ServeFile(w, r, dir+"/index.html")
+	})
 }

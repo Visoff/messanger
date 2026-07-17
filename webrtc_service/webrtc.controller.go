@@ -11,29 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/pion/turn/v5"
 	"github.com/pion/webrtc/v4"
 )
-
-type Room struct {
-	id      string
-	peers   map[string]*Peer
-	peersMU sync.RWMutex
-
-	trackForwarders  map[string]*TrackForwarder
-	trackForwarderMU sync.RWMutex
-}
-
-type TrackForwarder struct {
-	source       *webrtc.TrackRemote
-	sourcePeerID string
-	localTracks  map[string]*webrtc.TrackLocalStaticRTP
-	localTracksMU sync.RWMutex
-	cancel       context.CancelFunc
-}
 
 type WebRTCController struct {
 	mux            http.Handler
@@ -112,14 +94,6 @@ func (c *WebRTCController) HandleCreateRoom(w http.ResponseWriter, r *http.Reque
 	c.roomsMU.Unlock()
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(id))
-}
-
-type RTCMessage struct {
-	Type      string                     `json:"type"`
-	Offer     *webrtc.SessionDescription `json:"offer"`
-	Answer    *webrtc.SessionDescription `json:"answer"`
-	Candidate *webrtc.ICECandidateInit   `json:"candidate"`
-	PeerID    string                     `json:"peer_id,omitempty"`
 }
 
 func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
@@ -494,22 +468,4 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-}
-
-func validateJWT(tokenStr string) error {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		log.Println("WARNING: JWT_SECRET not set, skipping auth")
-		return nil
-	}
-	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method")
-		}
-		return []byte(jwtSecret), nil
-	})
-	if err != nil || !token.Valid {
-		return fmt.Errorf("invalid token")
-	}
-	return nil
 }
