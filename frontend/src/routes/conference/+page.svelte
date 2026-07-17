@@ -81,13 +81,16 @@
 
             const ip = import.meta.env.VITE_WEBRTC_SERVER_IP;
 
+            const turnUsername = import.meta.env.VITE_TURN_USERNAME || "username";
+            const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL || "password";
+
             peer = new RTCPeerConnection({
                 iceServers: [
                     { urls: `stun:${ip}:3478` },
                     {
                         urls: [`turn:${ip}:3478`],
-                        username: "username",
-                        credential: "password",
+                        username: turnUsername,
+                        credential: turnCredential,
                     },
                 ],
                 iceTransportPolicy: "all",

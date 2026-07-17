@@ -75,7 +75,11 @@ func main() {
 	}
 
 	// services
-	auth_service := services.NewAuthService("secret")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		panic("JWT_SECRET is not set")
+	}
+	auth_service := services.NewAuthService(jwtSecret)
 	user_service := services.NewUserService(repo, auth_service)
 	chat_service := services.NewChatService(repo)
 	topic_service := services.NewTopicService(repo)

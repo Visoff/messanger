@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
@@ -23,12 +24,25 @@ func main() {
 		port = "8080"
 	}
 
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	var originCheck func(r *http.Request) bool
+	if allowedOrigins == "" || allowedOrigins == "*" {
+		originCheck = func(r *http.Request) bool { return true }
+	} else {
+		origins := make(map[string]bool)
+		for _, o := range strings.Split(allowedOrigins, ",") {
+			origins[strings.TrimSpace(o)] = true
+		}
+		originCheck = func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			return origin == "" || origins[origin]
+		}
+	}
+
 	service := NewWebRTCService()
 
 	ws_updater := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
+		CheckOrigin: originCheck,
 	}
 
 	controller := NewWebRTCController(&ws_updater, service)

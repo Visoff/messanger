@@ -1,5 +1,8 @@
 use std::net::SocketAddr;
 
+use axum::http::{Method, Request, StatusCode};
+use axum::middleware::{self, Next};
+use axum::response::Response;
 use axum::routing::{get, post};
 use axum::Router;
 use tower_http::cors::CorsLayer;
@@ -26,6 +29,31 @@ async fn main() {
 
     let state = AppState { storage };
 
+    async fn auth_middleware(
+        req: Request<axum::body::Body>,
+        next: Next,
+    ) -> Result<Response, StatusCode> {
+        // Allow GET/HEAD without API key (public avatar URLs)
+        if req.method() == Method::GET || req.method() == Method::HEAD {
+            return Ok(next.run(req).await);
+        }
+
+        let api_key = std::env::var("FILE_STORAGE_API_KEY").ok();
+        match api_key {
+            Some(key) => {
+                let header = req
+                    .headers()
+                    .get("X-Api-Key")
+                    .and_then(|v| v.to_str().ok());
+                match header {
+                    Some(h) if h == key => Ok(next.run(req).await),
+                    _ => Err(StatusCode::UNAUTHORIZED),
+                }
+            }
+            None => Ok(next.run(req).await),
+        }
+    }
+
     let app = Router::new()
         .route("/file", post(api::upload))
         .route(
@@ -35,6 +63,7 @@ async fn main() {
                 .delete(api::delete_file),
         )
         .route("/{uuid}/hash", get(api::hash_file))
+        .layer(middleware::from_fn(auth_middleware))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

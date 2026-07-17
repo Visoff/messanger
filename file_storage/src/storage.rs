@@ -15,6 +15,7 @@ use crate::error::AppError;
 pub struct Storage {
     path: PathBuf,
     locks: Arc<DashMap<Uuid, Mutex<Vec<Range<u64>>>>>,
+    file_locks: Arc<DashMap<Uuid, Arc<tokio::sync::Mutex<()>>>>,
 }
 
 struct RangeGuard<'a> {
@@ -36,6 +37,7 @@ impl Storage {
         Self {
             path: path.into(),
             locks: Arc::new(DashMap::new()),
+            file_locks: Arc::new(DashMap::new()),
         }
     }
 
@@ -47,51 +49,78 @@ impl Storage {
         self.path.join(uuid.to_string())
     }
 
+    async fn with_file_lock<T, F, Fut>(&self, uuid: &Uuid, f: F) -> Result<T, AppError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<T, AppError>>,
+    {
+        let lock = self
+            .file_locks
+            .entry(*uuid)
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .value()
+            .clone();
+        let guard = lock.lock().await;
+        let result = f().await;
+        drop(guard);
+        result
+    }
+
     pub async fn store(&self, uuid: &Uuid, data: &[u8]) -> Result<(), AppError> {
-        fs::write(self.file_path(uuid), data).await?;
-        Ok(())
+        self.with_file_lock(uuid, || async {
+            fs::write(self.file_path(uuid), data).await?;
+            Ok(())
+        }).await
     }
 
     pub async fn get(&self, uuid: &Uuid) -> Result<Vec<u8>, AppError> {
-        Ok(fs::read(self.file_path(uuid)).await?)
+        self.with_file_lock(uuid, || async {
+            Ok(fs::read(self.file_path(uuid)).await?)
+        }).await
     }
 
     pub async fn delete(&self, uuid: &Uuid) -> Result<(), AppError> {
-        let path = self.file_path(uuid);
-        fs::remove_file(&path).await?;
-        self.locks.remove(uuid);
+        self.with_file_lock(uuid, || async {
+            let path = self.file_path(uuid);
+            fs::remove_file(&path).await?;
+            self.locks.remove(uuid);
+            Ok(())
+        }).await?;
+        self.file_locks.remove(uuid);
         Ok(())
     }
 
     pub async fn patch(&self, uuid: &Uuid, offset: u64, data: &[u8]) -> Result<(), AppError> {
-        let path = self.file_path(uuid);
-        let len = data.len() as u64;
-        let new_range = offset..offset + len;
+        self.with_file_lock(uuid, || async {
+            let path = self.file_path(uuid);
+            let len = data.len() as u64;
+            let new_range = offset..offset + len;
 
-        let guard = {
-            let entry = self.locks.entry(*uuid).or_insert_with(|| Mutex::new(Vec::new()));
-            let mut ranges = entry.value().lock();
-            if ranges.iter().any(|r| ranges_intersect(r, &new_range)) {
-                return Err(AppError::Conflict);
-            }
-            ranges.push(new_range.clone());
-            RangeGuard {
-                locks: &self.locks,
-                uuid: *uuid,
-                range: new_range,
-            }
-        };
+            let guard = {
+                let entry = self.locks.entry(*uuid).or_insert_with(|| Mutex::new(Vec::new()));
+                let mut ranges = entry.value().lock();
+                if ranges.iter().any(|r| ranges_intersect(r, &new_range)) {
+                    return Err(AppError::Conflict);
+                }
+                ranges.push(new_range.clone());
+                RangeGuard {
+                    locks: &self.locks,
+                    uuid: *uuid,
+                    range: new_range,
+                }
+            };
 
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(&path)
-            .await?;
-        file.seek(tokio::io::SeekFrom::Start(offset)).await?;
-        file.write_all(data).await?;
+            let mut file = fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&path)
+                .await?;
+            file.seek(tokio::io::SeekFrom::Start(offset)).await?;
+            file.write_all(data).await?;
 
-        drop(guard);
-        Ok(())
+            drop(guard);
+            Ok(())
+        }).await
     }
 
     pub async fn hash(

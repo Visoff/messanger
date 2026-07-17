@@ -5,6 +5,7 @@
     import { fetchChat, fetchMyRole } from "$lib/api/chats";
     import { user } from "$lib/stores/user";
     import { newMessageEvent } from "$lib/stores/messages";
+    import { getPubSub } from "$lib/services/pubsub";
     import type { Message, Topic, Chat } from "$lib/types";
 
     const { chat_id, topic_id }: { chat_id: string, topic_id?: string } = $props();
@@ -89,28 +90,38 @@
         });
     }
 
+    let pubsubCleanup: (() => void) | undefined;
+
     onMount(() => {
         const token = localStorage.getItem("token");
+        if (!token) return;
 
-        const stream = new EventSource(`${API_URL}/pubsub/sse?token=${token}`);
-        stream.addEventListener("message", (e) => {
-            const data = JSON.parse(e.data) as Message;
+        const pubsub = getPubSub(token);
+
+        const handler = (data: unknown) => {
+            const msg = data as Message;
             if (
-                data.chat_id == chat_id &&
-                (!topic_id || data.topic_id == topic_id)
+                msg.chat_id == chat_id &&
+                (!topic_id || msg.topic_id == topic_id)
             ) {
-                addOptimisticMessage(data);
-                newMessageEvent.set(data);
+                addOptimisticMessage(msg);
+                newMessageEvent.set(msg);
             } else {
-                newMessageEvent.set(data);
-                let content = data.content || "";
+                newMessageEvent.set(msg);
+                let content = msg.content || "";
                 if (content.length > 50) {
                     content = content.slice(0, 50) + "...";
                 }
                 notify("new message", content);
             }
-        });
+        };
 
+        pubsub.on("*", handler);
+        pubsubCleanup = () => pubsub.off("*", handler);
+    });
+
+    onDestroy(() => {
+        pubsubCleanup?.();
     });
 
     function scrollToBottom() {
@@ -155,8 +166,6 @@
         const d = new Date(date);
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-
-    import { onMount } from "svelte";
 </script>
 
 <div class="message-container">

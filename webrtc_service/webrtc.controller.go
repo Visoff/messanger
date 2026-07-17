@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/pion/turn/v5"
@@ -60,11 +61,17 @@ func NewWebRTCController(ws_updater *websocket.Upgrader, webrtc_service *WebRTCS
 		panic("PUBLIC_IP is not set")
 	}
 
+	turnSecret := os.Getenv("TURN_SECRET")
+	if turnSecret == "" {
+		turnSecret = "password"
+		log.Println("WARNING: TURN_SECRET not set, using default password")
+	}
+
 	_, err = turn.NewServer(turn.ServerConfig{
 		Realm:              "dev.uni.visoff.ru",
 		AllocationLifetime: 5 * time.Minute,
 		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
-			return ra.Username, turn.GenerateAuthKey(ra.Username, ra.Realm, "password"), true
+			return ra.Username, turn.GenerateAuthKey(ra.Username, ra.Realm, turnSecret), true
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
@@ -116,6 +123,16 @@ type RTCMessage struct {
 }
 
 func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "missing token", http.StatusUnauthorized)
+		return
+	}
+	if err := validateJWT(token); err != nil {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
+
 	conn, err := c.ws_updater.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -144,13 +161,20 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	c.roomsMU.Unlock()
 
+	turnSecret := os.Getenv("TURN_SECRET")
+	if turnSecret == "" {
+		turnSecret = "password"
+	}
+	turnUser := fmt.Sprintf("%d", time.Now().Unix())
+	turnPass := turn.GenerateAuthKey(turnUser, "dev.uni.visoff.ru", turnSecret)
+
 	peerConnectionConfig := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{fmt.Sprintf("stun:%v:3478", os.Getenv("PUBLIC_IP"))}},
 			{
 				URLs:       []string{fmt.Sprintf("turn:%v:3478", os.Getenv("PUBLIC_IP"))},
-				Username:   "username_server",
-				Credential: "password",
+				Username:   turnUser,
+				Credential: string(turnPass),
 			},
 		},
 		ICETransportPolicy: webrtc.ICETransportPolicyAll,
@@ -470,4 +494,22 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func validateJWT(tokenStr string) error {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Println("WARNING: JWT_SECRET not set, skipping auth")
+		return nil
+	}
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return fmt.Errorf("invalid token")
+	}
+	return nil
 }

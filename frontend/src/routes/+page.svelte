@@ -4,7 +4,7 @@
     import CategoryFilter from "$lib/components/CategoryFilter.svelte";
     import type { UserCategory } from "$lib/components/CategoryFilter.svelte";
     import { fetchCategories, updateCategory } from "$lib/api/categories";
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import { getMe } from "$lib/api/auth";
     import ChatCreationModel from "$lib/components/ChatCreationModel.svelte";
     import ChatPage from "$lib/components/ChatPage.svelte";
@@ -14,8 +14,7 @@
     import { goto } from "$app/navigation";
     import { user } from "$lib/stores/user";
     import { newMessageEvent } from "$lib/stores/messages";
-
-    let toast: Toast;
+    import { getPubSub, destroyPubSub } from "$lib/services/pubsub";
 
     let chat_id: string | undefined = $state(extractFromSearchParams("chat_id"));
     let chatListRefreshKey = $state(0);
@@ -50,7 +49,6 @@
         if (!token) {
             goto("/login");
         } else {
-            console.log(token);
             getMe().then(async (resp) => {
                 if ("error" in resp) {
                     console.error(resp.error);
@@ -75,20 +73,20 @@
         }
 
         if (token) {
-            const stream = new EventSource(`${API_URL}/pubsub/sse?token=${token}`);
-            stream.addEventListener("message", (e) => {
-                try {
-                    const data = JSON.parse(e.data);
-                    if (data.type === "chat_created" || data.type === "user_added_to_chat") {
-                        chatListRefreshKey++;
-                    } else if (data.chat_id) {
-                        newMessageEvent.set(data);
-                    }
-                } catch {
-                    // TODO: handle
+            const pubsub = getPubSub(token);
+            pubsub.on("chat_created", () => { chatListRefreshKey++; });
+            pubsub.on("user_added_to_chat", () => { chatListRefreshKey++; });
+            pubsub.on("*", (data) => {
+                const d = data as Record<string, unknown>;
+                if (d.chat_id) {
+                    newMessageEvent.set(d as never);
                 }
             });
         }
+    });
+
+    onDestroy(() => {
+        destroyPubSub();
     });
 
     let accountMenu: AccountMenu;
