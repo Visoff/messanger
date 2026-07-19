@@ -10,6 +10,9 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::storage::Storage;
 
+use std::io::Cursor;
+use tokio_util::io::ReaderStream;
+
 #[derive(Clone)]
 pub struct AppState {
     pub storage: Storage,
@@ -46,7 +49,35 @@ pub async fn upload(
         .and_then(|v| v.to_str().ok())
     {
         Some(ct) if ct.starts_with("multipart/form-data") => {
-            extract_multipart_field(&body, ct, "file")?
+            let boundary = ct
+                .split("boundary=")
+                .nth(1)
+                .ok_or(AppError::InvalidMultipart)?
+                .split(';')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .trim_matches('"');
+            let stream = ReaderStream::new(Cursor::new(body));
+            let mut multipart = multer::Multipart::new(stream, boundary);
+            let mut found = None;
+            while let Some(field) = multipart
+                .next_field()
+                .await
+                .map_err(|_| AppError::InvalidMultipart)?
+            {
+                if field.name() == Some("file") {
+                    found = Some(
+                        field
+                            .bytes()
+                            .await
+                            .map_err(|_| AppError::InvalidMultipart)?
+                            .to_vec(),
+                    );
+                    break;
+                }
+            }
+            found.ok_or(AppError::MissingField)?
         }
         _ => body.to_vec(),
     };
@@ -106,67 +137,4 @@ pub async fn delete_file(
     Ok(StatusCode::NO_CONTENT)
 }
 
-fn extract_multipart_field(body: &[u8], content_type: &str, field_name: &str) -> Result<Vec<u8>, AppError> {
-    let boundary = content_type
-        .split("boundary=")
-        .nth(1)
-        .ok_or(AppError::InvalidMultipart)?
-        .split(';')
-        .next()
-        .ok_or(AppError::InvalidMultipart)?
-        .trim()
-        .trim_matches('"');
 
-    let boundary_start = format!("--{}", boundary);
-    let boundary_bytes = boundary_start.as_bytes();
-    let mut remaining = body;
-
-    loop {
-        let idx = remaining
-            .windows(boundary_bytes.len())
-            .position(|w| w == boundary_bytes);
-
-        match idx {
-            None => break,
-            Some(pos) => {
-                remaining = &remaining[pos + boundary_bytes.len()..];
-
-                if remaining.starts_with(b"--") {
-                    break;
-                }
-                if remaining.starts_with(b"\r\n") {
-                    remaining = &remaining[2..];
-                }
-
-                let hdr_end = remaining.windows(4).position(|w| w == b"\r\n\r\n");
-
-                match hdr_end {
-                    None => continue,
-                    Some(end) => {
-                        let hdrs = std::str::from_utf8(&remaining[..end])
-                            .map_err(|_| AppError::InvalidMultipart)?;
-
-                        remaining = &remaining[end + 4..];
-
-                        if hdrs.contains(&format!("name=\"{}\"", field_name)) {
-                            let next = remaining
-                                .windows(boundary_bytes.len())
-                                .position(|w| w == boundary_bytes)
-                                .unwrap_or(remaining.len());
-
-                            let part_body = &remaining[..next];
-                            let trimmed = if part_body.ends_with(b"\r\n") {
-                                &part_body[..part_body.len() - 2]
-                            } else {
-                                part_body
-                            };
-                            return Ok(trimmed.to_vec());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Err(AppError::MissingField)
-}

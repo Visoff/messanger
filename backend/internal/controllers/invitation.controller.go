@@ -6,6 +6,7 @@ import (
 
 	"github.com/Visoff/messanger/internal/services"
 	"github.com/Visoff/messanger/pkgs/handlers"
+	"github.com/Visoff/messanger/pkgs/httperrors"
 )
 
 type InvitationController struct {
@@ -57,8 +58,7 @@ func (c *InvitationController) GetInvitationInfo(w http.ResponseWriter, r *http.
 
 	info, err := c.chatService.GetInvitationInfo(r.Context(), invitation_id)
 	if err != nil {
-		http.Error(w, `{"error":"invitation not found"}`, http.StatusNotFound)
-		return nil
+		return httperrors.NewHTTPNotFoundError("invitation not found")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -87,8 +87,7 @@ func (c *InvitationController) AcceptInvitationJson(w http.ResponseWriter, r *ht
 
 	chat, err := c.chatService.AcceptInvitation(r.Context(), invitation_id)
 	if err != nil {
-		http.Error(w, `{"error":"failed to accept invitation"}`, http.StatusBadRequest)
-		return nil
+		return httperrors.NewHTTPBadRequestError("failed to accept invitation")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -116,8 +115,7 @@ func (c *InvitationController) RejectInvitation(w http.ResponseWriter, r *http.R
 	}
 
 	if err := c.chatService.UseInvitation(r.Context(), invitation_id); err != nil {
-		http.Error(w, `{"error":"failed to reject invitation"}`, http.StatusInternalServerError)
-		return nil
+		return httperrors.NewHTTPBadRequestError("failed to reject invitation")
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -1,15 +1,12 @@
-from golang:1.26 as builder
+FROM golang:1.26-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . ./
+RUN CGO_ENABLED=0 go build -o main .
 
-workdir /app
-
-copy . .
-
-run go mod download
-
-run go build -o main .
-
-from debian:stable-slim
-
-copy --from=builder /app/main /app/main
-
-cmd ["/app/main"]
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /app/main /app/main
+EXPOSE 8081 3478/udp
+CMD ["/app/main"]

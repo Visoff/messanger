@@ -17,23 +17,6 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-type Room struct {
-	id      string
-	peers   map[string]*Peer
-	peersMU sync.RWMutex
-
-	trackForwarders  map[string]*TrackForwarder
-	trackForwarderMU sync.RWMutex
-}
-
-type TrackForwarder struct {
-	source       *webrtc.TrackRemote
-	sourcePeerID string
-	localTracks  map[string]*webrtc.TrackLocalStaticRTP
-	localTracksMU sync.RWMutex
-	cancel       context.CancelFunc
-}
-
 type WebRTCController struct {
 	mux            http.Handler
 	webrtc_service *WebRTCService
@@ -60,11 +43,17 @@ func NewWebRTCController(ws_updater *websocket.Upgrader, webrtc_service *WebRTCS
 		panic("PUBLIC_IP is not set")
 	}
 
+	turnSecret := os.Getenv("TURN_SECRET")
+	if turnSecret == "" {
+		turnSecret = "password"
+		log.Println("WARNING: TURN_SECRET not set, using default password")
+	}
+
 	_, err = turn.NewServer(turn.ServerConfig{
 		Realm:              "dev.uni.visoff.ru",
 		AllocationLifetime: 5 * time.Minute,
 		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
-			return ra.Username, turn.GenerateAuthKey(ra.Username, ra.Realm, "password"), true
+			return ra.Username, turn.GenerateAuthKey(ra.Username, ra.Realm, turnSecret), true
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
@@ -107,15 +96,17 @@ func (c *WebRTCController) HandleCreateRoom(w http.ResponseWriter, r *http.Reque
 	w.Write([]byte(id))
 }
 
-type RTCMessage struct {
-	Type      string                     `json:"type"`
-	Offer     *webrtc.SessionDescription `json:"offer"`
-	Answer    *webrtc.SessionDescription `json:"answer"`
-	Candidate *webrtc.ICECandidateInit   `json:"candidate"`
-	PeerID    string                     `json:"peer_id,omitempty"`
-}
-
 func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "missing token", http.StatusUnauthorized)
+		return
+	}
+	if err := validateJWT(token); err != nil {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
+
 	conn, err := c.ws_updater.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -144,13 +135,20 @@ func (c *WebRTCController) HandleRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	c.roomsMU.Unlock()
 
+	turnSecret := os.Getenv("TURN_SECRET")
+	if turnSecret == "" {
+		turnSecret = "password"
+	}
+	turnUser := fmt.Sprintf("%d", time.Now().Unix())
+	turnPass := turn.GenerateAuthKey(turnUser, "dev.uni.visoff.ru", turnSecret)
+
 	peerConnectionConfig := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{fmt.Sprintf("stun:%v:3478", os.Getenv("PUBLIC_IP"))}},
 			{
 				URLs:       []string{fmt.Sprintf("turn:%v:3478", os.Getenv("PUBLIC_IP"))},
-				Username:   "username_server",
-				Credential: "password",
+				Username:   turnUser,
+				Credential: string(turnPass),
 			},
 		},
 		ICETransportPolicy: webrtc.ICETransportPolicyAll,

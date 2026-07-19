@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"context"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Visoff/messanger/internal/services"
@@ -26,6 +28,7 @@ func NewPubSubController(pubsubService *services.PubSubService, webpushService *
 	c.mux = mux
 
 	mux.Handle("GET /sse", authService.ProtectRoute(handlers.Handler(c.SSE)))
+	mux.Handle("GET /poll", authService.ProtectRoute(handlers.Handler(c.Poll)))
 	mux.Handle("GET /push/pubkey", handlers.Handler(c.GetPushPubKey))
 	mux.Handle("POST /push/subscribe", authService.ProtectRoute(handlers.Handler(c.SubscribePush)))
 	mux.Handle("POST /push/notify", handlers.Handler(c.NotifyPush))
@@ -85,6 +88,46 @@ func (c *PubSubController) SSE(w http.ResponseWriter, r *http.Request) error {
 			w.Write([]byte("\n\n"))
 			flusher.Flush()
 		}
+	}
+}
+
+// Poll is a long-polling fallback for SSE. Blocks up to `timeout` seconds.
+func (c *PubSubController) Poll(w http.ResponseWriter, r *http.Request) error {
+	user_id, err := services.ExtractUserId(r.Context())
+	if err != nil {
+		return err
+	}
+
+	timeout := 30
+	if t := r.URL.Query().Get("timeout"); t != "" {
+		if v, err := strconv.Atoi(t); err == nil && v > 0 && v <= 60 {
+			timeout = v
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	ch, err := c.pubsubService.Subscribe(ctx, user_id.String())
+	if err != nil {
+		return err
+	}
+
+	flusher := w.(http.Flusher)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+
+	select {
+	case <-ctx.Done():
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("[]"))
+		return nil
+	case msg := <-ch:
+		w.WriteHeader(http.StatusOK)
+		payload := msg.Payload
+		w.Write([]byte("[" + payload + "]"))
+		flusher.Flush()
+		return nil
 	}
 }
 

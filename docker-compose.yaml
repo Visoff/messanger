@@ -13,23 +13,41 @@ services:
     ports:
       - 6379:6379
 
+  file_storage:
+    build:
+      context: file_storage
+    ports:
+      - 3001:3001
+    environment:
+      - STORAGE_PATH=/data
+      - BIND_ADDR=0.0.0.0:3001
+      - FILE_STORAGE_API_KEY=${FILE_STORAGE_API_KEY:-change-me}
+    volumes:
+      - file_data:/data
+
   api:
     build:
-      context: backend
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - 3478:3478/udp
-      #- 49152-65535:49152-65535/udp
       - 8080:8080
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger?sslmode=disable
       - REDIS_URL=valkey:6379
-      - VALKEY_URL=valkey:6379
-      - PUBLIC_IP=192.168.100.6
-      - VAPID_PUBLIC_KEY=BPTNpgj3cjWFNTiZH22QTdb600avvQAZ3PPhwNWILdT2q5zXdB3nLQ9Rd0QZ_sFU24gdxUEKNpbovVXbab2O0gY
-      - VAPID_PRIVATE_KEY=TLI6GRxBORMCeVnjvGzzvqQuaMkty0r52bDRiImTJns
+      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-random-string}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - FRONTEND_URL=http://localhost:5173
+      - FILE_STORAGE_URL=http://file_storage:3001
+      - PUBLIC_FILE_STORAGE_URL=http://localhost:3001
+      - FILE_STORAGE_API_KEY=${FILE_STORAGE_API_KEY:-change-me}
+      - ALLOWED_ORIGINS=http://localhost:5173
+      - TURN_SECRET=${TURN_SECRET:-password}
     depends_on:
       - postgres
       - valkey
+      - file_storage
 
   webrtc:
     build:
@@ -37,6 +55,11 @@ services:
     ports:
       - 8081:8081
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/messanger?sslmode=disable
-      - PUBLIC_IP=192.168.100.6
+      - PUBLIC_IP=${PUBLIC_IP:-127.0.0.1}
       - PORT=8081
+      - TURN_SECRET=${TURN_SECRET:-password}
+      - ALLOWED_ORIGINS=http://localhost:5173
+      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-random-string}
+
+volumes:
+  file_data:

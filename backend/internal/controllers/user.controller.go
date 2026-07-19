@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/Visoff/messanger/internal/services"
@@ -239,7 +240,16 @@ func (c *UserController) UploadMyAvatar(w http.ResponseWriter, r *http.Request) 
 }
 
 func (c *UserController) uploadToFileStorage(data []byte) (string, error) {
-	resp, err := http.Post(c.fileStorageUrl+"/file", "application/octet-stream", bytes.NewReader(data))
+	req, err := http.NewRequest("POST", c.fileStorageUrl+"/file", bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	apiKey := os.Getenv("FILE_STORAGE_API_KEY")
+	if apiKey != "" {
+		req.Header.Set("X-Api-Key", apiKey)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}

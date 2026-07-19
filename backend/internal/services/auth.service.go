@@ -12,6 +12,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type contextKey string
+
+const UserIDKey contextKey = "user_id"
+
 type AuthService struct {
 	jwt_secret string
 }
@@ -79,14 +83,14 @@ func (s *AuthService) ProtectRoute(handler handlers.Handler) handlers.Handler {
 		if err != nil {
 			return httperrors.NewHTTPUnauthorizedError("Unauthorized")
 		}
-		ctx := context.WithValue(r.Context(), "user_id", user_id)
+		ctx := context.WithValue(r.Context(), UserIDKey, user_id)
 		return handler(w, r.WithContext(ctx))
 	}
 }
 
 
 func ExtractUserId(ctx context.Context) (uuid.UUID, error) {
-	user_id, ok := ctx.Value("user_id").(string)
+	user_id, ok := ctx.Value(UserIDKey).(string)
 	if !ok {
 		return uuid.UUID{}, httperrors.NewHTTPUnauthorizedError("Unauthorized")
 	}
